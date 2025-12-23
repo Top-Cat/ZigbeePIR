@@ -1,0 +1,21 @@
+#ifndef FW_VERSION
+#define FW_VERSION 0x00000002
+#endif
+
+#ifndef DATE_CODE
+#define DATE_CODE "19700101"
+#endif
+
+#ifndef SW_VERSION
+#define SW_VERSION "0.0.0"
+#endif
+
+#define OCCUPANCY_SENSOR_ENDPOINT_NUMBER 10
+#define HEARTBEAT_INTERVAL 60000000
+#define HOLDOUT_US 10000000
+
+#define BUTTON_PIN  GPIO_NUM_9
+#define SWITCH_PIN  GPIO_NUM_5
+#define SENSOR_PIN  GPIO_NUM_4
+#define LED_PIN     GPIO_NUM_3
+#define WS2812_PIN  GPIO_NUM_0
