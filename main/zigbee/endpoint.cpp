@@ -2,7 +2,7 @@
 #include "freertos/semphr.h"
 
 #include "esp_zigbee_core.h"
-#include "../helpers.h"
+#include "helpers.h"
 
 #include "endpoint.h"
 

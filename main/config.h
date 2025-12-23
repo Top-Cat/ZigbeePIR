@@ -1,5 +1,5 @@
 #ifndef FW_VERSION
-#define FW_VERSION 0x00000002
+#define FW_VERSION 0x00000001
 #endif
 
 #ifndef DATE_CODE

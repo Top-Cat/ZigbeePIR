@@ -5,7 +5,7 @@
 #include "esp_log.h"
 
 #include "config.h"
-#include "helpers.h"
+#include "zigbee/helpers.h"
 
 #include "sensor.h"
 

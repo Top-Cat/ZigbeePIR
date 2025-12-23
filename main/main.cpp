@@ -12,8 +12,6 @@
 #include "zigbee/handlers.h"
 #include "zigbee/core.h"
 
-#include "ota.h"
-
 ZigbeeSensor zbOccupancySensor = ZigbeeSensor(10);
 
 void IRAM_ATTR pirISR() {
