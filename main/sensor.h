@@ -1,8 +1,11 @@
 #include "esp_zigbee_type.h"
 
 #include "zigbee/endpoint.h"
+#include "prefs.h"
 
 #define OTA_UPGRADE_QUERY_INTERVAL (1 * 60)
+#define NVS_NAMESPACE "config"
+#define NVS_OCC_TIMEOUT "occ_timeout"
 
 class ZigbeeSensor : public ZigbeeDevice {
     public:
@@ -20,7 +23,11 @@ class ZigbeeSensor : public ZigbeeDevice {
         void requestOTA();
         bool report();
     private:
-        const char *TAG = "TC-ZBS";
+        const char* TAG = "TC-ZBS";
+        const char* manufacturer_name = "TC";
+        const char* model_identifier = "Kitchen PIR Sensor";
+
+        Preferences prefs;
 
         esp_zb_basic_cluster_cfg_t basic_cfg;
         esp_zb_identify_cluster_cfg_t identify_cfg;

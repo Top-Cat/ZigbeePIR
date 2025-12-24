@@ -198,8 +198,20 @@ extern "C" void app_main(void) {
     gpioConfig.mode = GPIO_MODE_OUTPUT;
     gpio_config(&gpioConfig);
 
+    zbOccupancySensor.init();
+    zbOccupancySensor.onLightChange(setOnOff);
+
     zigbeeCore.registerEndpoint(&zbOccupancySensor);
     zigbeeCore.start();
+
+    printf("Connecting to network\n");
+    while (!zigbeeConnected) {
+        printf(".");
+        vTaskDelay(100 / portTICK_PERIOD_MS);
+    }
+    printf("\n");
+
+    zbOccupancySensor.requestOTA();
 
     xTaskCreate(main_task, "Main", 4096, NULL, 4, NULL);
 

@@ -19,38 +19,22 @@ void ZigbeeSensor::createBasicCluster(esp_zb_cluster_list_t* cluster_list) {
 
     char zigbee_swid[16];
     fill_zcl_string(zigbee_swid, sizeof(zigbee_swid), swBuildId);
-
-    esp_zb_cluster_add_attr(
-        basic_cluster,
-        ESP_ZB_ZCL_CLUSTER_ID_BASIC,
-        ESP_ZB_ZCL_ATTR_BASIC_SW_BUILD_ID,
-        ESP_ZB_ZCL_ATTR_TYPE_CHAR_STRING,
-        ESP_ZB_ZCL_ATTR_ACCESS_READ_ONLY,
-        (void *)&zigbee_swid
-    );
+    esp_zb_basic_cluster_add_attr(basic_cluster, ESP_ZB_ZCL_ATTR_BASIC_SW_BUILD_ID, (void*) &zigbee_swid);
 
     char zigbee_datecode[50];
     fill_zcl_string(zigbee_datecode, sizeof(zigbee_datecode), dateCode);
-
-    esp_zb_cluster_add_attr(
-        basic_cluster,
-        ESP_ZB_ZCL_CLUSTER_ID_BASIC,
-        ESP_ZB_ZCL_ATTR_BASIC_DATE_CODE_ID,
-        ESP_ZB_ZCL_ATTR_TYPE_CHAR_STRING,
-        ESP_ZB_ZCL_ATTR_ACCESS_READ_ONLY,
-        (void *)&zigbee_datecode
-    );
+    esp_zb_basic_cluster_add_attr(basic_cluster, ESP_ZB_ZCL_ATTR_BASIC_DATE_CODE_ID, (void*) &zigbee_datecode);
 
     uint16_t stack_version = 0x30;
+    esp_zb_basic_cluster_add_attr(basic_cluster, ESP_ZB_ZCL_ATTR_BASIC_STACK_VERSION_ID, (void*) &stack_version);
 
-    esp_zb_cluster_add_attr(
-        basic_cluster,
-        ESP_ZB_ZCL_CLUSTER_ID_BASIC,
-        ESP_ZB_ZCL_ATTR_BASIC_STACK_VERSION_ID,
-        ESP_ZB_ZCL_ATTR_TYPE_U16,
-        ESP_ZB_ZCL_ATTR_ACCESS_READ_ONLY,
-        (void *)&stack_version
-    );
+    char zb_name[50];
+    fill_zcl_string(zb_name, sizeof(zb_name), manufacturer_name);
+    esp_zb_basic_cluster_add_attr(basic_cluster, ESP_ZB_ZCL_ATTR_BASIC_MANUFACTURER_NAME_ID, (void*) &zb_name);
+
+    char zb_model[50];
+    fill_zcl_string(zb_model, sizeof(zb_model), model_identifier);
+    esp_zb_basic_cluster_add_attr(basic_cluster, ESP_ZB_ZCL_ATTR_BASIC_MODEL_IDENTIFIER_ID, (void*) &zb_model);
 }
 
 
@@ -62,14 +46,7 @@ void ZigbeeSensor::createOccupancyCluster(esp_zb_cluster_list_t* cluster_list) {
     esp_zb_attribute_list_t *occupancy_cluster = esp_zb_occupancy_sensing_cluster_create(&occupancy_meas_cfg);
     esp_zb_cluster_list_add_occupancy_sensing_cluster(cluster_list, occupancy_cluster, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
 
-    esp_zb_cluster_add_attr(
-        occupancy_cluster,
-        ESP_ZB_ZCL_CLUSTER_ID_OCCUPANCY_SENSING,
-        ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_PIR_OCC_TO_UNOCC_DELAY_ID,
-        ESP_ZB_ZCL_ATTR_TYPE_U16,
-        ESP_ZB_ZCL_ATTR_ACCESS_READ_WRITE,
-        &occupancyTimeoutSec
-    );
+    esp_zb_occupancy_sensing_cluster_add_attr(occupancy_cluster, ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_PIR_OCC_TO_UNOCC_DELAY_ID, (void*) &occupancyTimeoutSec);
 }
 
 void ZigbeeSensor::createOnOffCluster(esp_zb_cluster_list_t* cluster_list) {
@@ -159,9 +136,9 @@ void ZigbeeSensor::zbAttributeSet(const esp_zb_zcl_set_attr_value_message_t *mes
         }
 
         occupancyTimeoutSec = newTimeout;
-        /*prefs.begin(NVS_NAMESPACE, false);
+        prefs.begin(NVS_NAMESPACE, false);
         prefs.putUShort(NVS_OCC_TIMEOUT, newTimeout);
-        prefs.end();*/
+        prefs.end();
 
         ESP_LOGI(TAG, "Occupancy timeout updated: %u seconds\n", newTimeout);
     } else if (message->info.cluster == ESP_ZB_ZCL_CLUSTER_ID_ON_OFF && message->attribute.id == ESP_ZB_ZCL_ATTR_ON_OFF_ON_OFF_ID) {
@@ -180,9 +157,9 @@ uint16_t ZigbeeSensor::getTimeout() {
 }
 
 void ZigbeeSensor::init() {
-    /*prefs.begin(NVS_NAMESPACE, false);
+    prefs.begin(NVS_NAMESPACE, false);
     occupancyTimeoutSec = prefs.getUShort(NVS_OCC_TIMEOUT, 60);
-    prefs.end();*/
+    prefs.end();
 
     ESP_LOGI(TAG, "Occupancy timeout loaded: %u seconds\n", occupancyTimeoutSec);
 }

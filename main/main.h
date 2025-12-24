@@ -4,8 +4,6 @@
 #define HA_ESP_LIGHT_ENDPOINT           10
 
 static const char *TAG = "TC-ZB";
-static char manufacturer_name[] = "\x02""TC";
-static char model_identifier[] = "\x12""Kitchen PIR Sensor";
 
 volatile bool occupancy_changed = false;
 volatile bool button_pressed = false;
