@@ -136,6 +136,7 @@ esp_err_t ZigbeeHandlers::upgradeStatus(const esp_zb_zcl_ota_upgrade_value_messa
     static uint32_t total_size = 0;
     static uint32_t offset = 0;
     static int64_t start_time = 0;
+    bool delta = message->ota_header.image_type != 0x1011;
     esp_err_t ret = ESP_OK;
 
     if (message->info.status == ESP_ZB_ZCL_STATUS_SUCCESS) {
@@ -146,7 +147,11 @@ esp_err_t ZigbeeHandlers::upgradeStatus(const esp_zb_zcl_ota_upgrade_value_messa
             start_time = esp_timer_get_time();
             s_ota_partition = esp_ota_get_next_update_partition(NULL);
             assert(s_ota_partition);
-            ret = esp_delta_ota_begin(s_ota_partition, 0, &s_ota_handle);
+            if (delta) {
+                ret = esp_delta_ota_begin(s_ota_partition, 0, &s_ota_handle);
+            } else {
+                ret = esp_ota_begin(s_ota_partition, 0, &s_ota_handle);
+            }
             if (ret != ESP_OK) {
                 ESP_LOGE(TAG, "Zigbee - Failed to begin OTA partition, status: %s", esp_err_to_name(ret));
                 return ret;
@@ -164,7 +169,11 @@ esp_err_t ZigbeeHandlers::upgradeStatus(const esp_zb_zcl_ota_upgrade_value_messa
                     ESP_LOGE(TAG, "Zigbee - Failed to element OTA data, status: %s", esp_err_to_name(ret));
                     return ret;
                 }
-                ret = esp_delta_ota_write(s_ota_handle, (uint8_t*)payload, payload_size);
+                if (delta) {
+                    ret = esp_delta_ota_write(s_ota_handle, (uint8_t*)payload, payload_size);
+                } else {
+                    ret = esp_ota_write(s_ota_handle, (const void *)payload, payload_size);
+                }
                 if (ret != ESP_OK) {
                     ESP_LOGI(TAG, "Zigbee - Failed to write OTA data to partition, status: %s", esp_err_to_name(ret));
                     return ret;
@@ -188,7 +197,11 @@ esp_err_t ZigbeeHandlers::upgradeStatus(const esp_zb_zcl_ota_upgrade_value_messa
                 message->ota_header.file_version, message->ota_header.manufacturer_code, message->ota_header.image_type, message->ota_header.image_size,
                 (esp_timer_get_time() - start_time) / 1000
             );
-            ret = esp_delta_ota_end(s_ota_handle);
+            if (delta) {
+                ret = esp_delta_ota_end(s_ota_handle);
+            } else {
+                ret = esp_ota_end(s_ota_handle);
+            }
             if (ret != ESP_OK) {
                 ESP_LOGE(TAG, "Zigbee - Failed to end OTA partition, status: %s", esp_err_to_name(ret));
                 return ret;
