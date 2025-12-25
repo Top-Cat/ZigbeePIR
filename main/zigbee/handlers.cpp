@@ -136,7 +136,7 @@ esp_err_t ZigbeeHandlers::upgradeStatus(const esp_zb_zcl_ota_upgrade_value_messa
     static uint32_t total_size = 0;
     static uint32_t offset = 0;
     static int64_t start_time = 0;
-    bool delta = message->ota_header.image_type != 0x1011;
+    bool delta = message->ota_header.optional.minimum_hardware_version == 2;
     esp_err_t ret = ESP_OK;
 
     if (message->info.status == ESP_ZB_ZCL_STATUS_SUCCESS) {
