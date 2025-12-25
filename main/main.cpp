@@ -49,11 +49,15 @@ static void bdb_start_top_level_commissioning_cb(uint8_t mode_mask) {
     ESP_RETURN_ON_FALSE(esp_zb_bdb_start_top_level_commissioning(mode_mask) == ESP_OK, , TAG, "Failed to start Zigbee commissioning");
 }
 
-// TODO: Add more handlers from arduino-esp32/zigbee
 void esp_zb_app_signal_handler(esp_zb_app_signal_t *signal_struct) {
     uint32_t *p_sg_p       = signal_struct->p_app_signal;
     esp_err_t err_status = signal_struct->esp_err_status;   
     esp_zb_app_signal_type_t sig_type = (esp_zb_app_signal_type_t)*p_sg_p;
+    esp_zb_zdo_signal_leave_params_t *leave_params = NULL;
+
+    // Router
+    esp_zb_zdo_signal_device_update_params_t *dev_update_params = NULL;
+
     switch (sig_type) {
     case ESP_ZB_ZDO_SIGNAL_SKIP_STARTUP:
         ESP_LOGI(TAG, "Initialize Zigbee stack");
@@ -67,12 +71,18 @@ void esp_zb_app_signal_handler(esp_zb_app_signal_t *signal_struct) {
             if (esp_zb_bdb_is_factory_new()) {
                 ESP_LOGI(TAG, "Start network steering");
                 esp_zb_bdb_start_top_level_commissioning(ESP_ZB_BDB_MODE_NETWORK_STEERING);
+                zigbeeCore.started = true;
             } else {
                 ESP_LOGI(TAG, "Device rebooted");
+                zigbeeCore.started = true;
+                zigbeeCore.connected = true;
+                zigbeeCore.setChannelMask(1 << esp_zb_get_current_channel());
+                zigbeeCore.searchBindings();
             }
         } else {
             /* commissioning failed */
             ESP_LOGW(TAG, "Failed to initialize Zigbee stack (status: %s)", esp_err_to_name(err_status));
+            esp_zb_scheduler_alarm((esp_zb_callback_t)bdb_start_top_level_commissioning_cb, ESP_ZB_BDB_MODE_INITIALIZATION, 500);
         }
         break;
     case ESP_ZB_BDB_SIGNAL_STEERING:
@@ -83,10 +93,27 @@ void esp_zb_app_signal_handler(esp_zb_app_signal_t *signal_struct) {
                      extended_pan_id[7], extended_pan_id[6], extended_pan_id[5], extended_pan_id[4],
                      extended_pan_id[3], extended_pan_id[2], extended_pan_id[1], extended_pan_id[0],
                      esp_zb_get_pan_id(), esp_zb_get_current_channel(), esp_zb_get_short_address());
-            zigbeeConnected = true;
+            zigbeeCore.connected = true;
+            zigbeeCore.setChannelMask(1 << esp_zb_get_current_channel());
         } else {
             ESP_LOGI(TAG, "Network steering was not successful (status: %s)", esp_err_to_name(err_status));
             esp_zb_scheduler_alarm((esp_zb_callback_t)bdb_start_top_level_commissioning_cb, ESP_ZB_BDB_MODE_NETWORK_STEERING, 1000);
+        }
+        break;
+    case ESP_ZB_ZDO_SIGNAL_DEVICE_UPDATE:
+        dev_update_params = (esp_zb_zdo_signal_device_update_params_t *)esp_zb_app_signal_get_params(p_sg_p);
+        ESP_LOGI(TAG, "New device commissioned or rejoined (short: 0x%04hx)", dev_update_params->short_addr);
+        zigbeeCore.deviceUpdate(dev_update_params);
+        break;
+    case ESP_ZB_ZDO_SIGNAL_LEAVE:
+        leave_params = (esp_zb_zdo_signal_leave_params_t *)esp_zb_app_signal_get_params(p_sg_p);
+        ESP_LOGV(TAG, "Signal to leave the network, leave type: %d", leave_params->leave_type);
+        if (leave_params->leave_type == ESP_ZB_NWK_LEAVE_TYPE_RESET) {
+            ESP_LOGI(TAG, "Leave without rejoin, factory reset the device");
+            esp_zb_factory_reset();
+        } else {  // Leave with rejoin -> Rejoin the network, only reboot the device
+            ESP_LOGI(TAG, "Leave with rejoin, only reboot the device");
+            esp_restart();
         }
         break;
     default:
@@ -139,7 +166,7 @@ void handleHeartbeat() {
         return;
 
     lastHeartbeat = esp_timer_get_time();
-    if (zigbeeConnected) {
+    if (zigbeeCore.connected) {
         zbOccupancySensor.report();
     } else {
         ESP_LOGI(TAG, "Zigbee not connected, attempting reconnect...");
@@ -205,7 +232,7 @@ extern "C" void app_main(void) {
     zigbeeCore.start();
 
     printf("Connecting to network\n");
-    while (!zigbeeConnected) {
+    while (!zigbeeCore.connected) {
         printf(".");
         vTaskDelay(100 / portTICK_PERIOD_MS);
     }
