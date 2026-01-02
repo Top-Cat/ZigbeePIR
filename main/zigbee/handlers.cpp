@@ -136,6 +136,7 @@ esp_err_t ZigbeeHandlers::upgradeStatus(const esp_zb_zcl_ota_upgrade_value_messa
     static uint32_t total_size = 0;
     static uint32_t offset = 0;
     static int64_t start_time = 0;
+    static bool ota_started = false;
     bool delta = message->ota_header.optional.minimum_hardware_version == 2;
     esp_err_t ret = ESP_OK;
 
@@ -143,21 +144,26 @@ esp_err_t ZigbeeHandlers::upgradeStatus(const esp_zb_zcl_ota_upgrade_value_messa
         switch (message->upgrade_status) {
         case ESP_ZB_ZCL_OTA_UPGRADE_STATUS_START:
             ESP_LOGI(TAG, "Zigbee - OTA upgrade start");
-
             start_time = esp_timer_get_time();
-            s_ota_partition = esp_ota_get_next_update_partition(NULL);
-            assert(s_ota_partition);
-            if (delta) {
-                ret = esp_delta_ota_begin(s_ota_partition, 0, &s_ota_handle);
-            } else {
-                ret = esp_ota_begin(s_ota_partition, 0, &s_ota_handle);
-            }
-            if (ret != ESP_OK) {
-                ESP_LOGE(TAG, "Zigbee - Failed to begin OTA partition, status: %s", esp_err_to_name(ret));
-                return ret;
-            }
+            ota_started = false;
             break;
         case ESP_ZB_ZCL_OTA_UPGRADE_STATUS_RECEIVE:
+            if (!ota_started) {
+                ota_started = true;
+
+                s_ota_partition = esp_ota_get_next_update_partition(NULL);
+                assert(s_ota_partition);
+                if (delta) {
+                    ret = esp_delta_ota_begin(s_ota_partition, 0, &s_ota_handle);
+                } else {
+                    ret = esp_ota_begin(s_ota_partition, 0, &s_ota_handle);
+                }
+                if (ret != ESP_OK) {
+                    ESP_LOGE(TAG, "Zigbee - Failed to begin OTA partition, status: %s", esp_err_to_name(ret));
+                    return ret;
+                }
+            }
+
             total_size = message->ota_header.image_size;
             offset += message->payload_size;
             ESP_LOGI(TAG, "Zigbee - OTA Client receives data: progress [%ld/%ld]", offset, total_size);
