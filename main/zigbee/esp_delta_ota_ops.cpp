@@ -30,10 +30,21 @@ static esp_err_t delta_ota_patch_header_verify(void *img_hdr_data) {
         return ESP_ERR_INVALID_ARG;
     }
 
-    digest = (uint8_t *)((uint32_t*)img_hdr_data + sizeof(uint32_t));
+    digest = (uint8_t *)img_hdr_data + 4;
     esp_partition_get_sha256(s_cur_partition, sha_256);
     if (memcmp(sha_256, digest, DELTA_OTA_UPGRADE_DIGEST_SIZE) != 0) {
-        ESP_LOGE(TAG, "Invalid patch, the SHA256 of the current firmware differs from that in the patch header.");
+
+        char current_sha_str[DELTA_OTA_UPGRADE_DIGEST_SIZE * 2 + 1] = {0};
+        for (int i = 0; i < DELTA_OTA_UPGRADE_DIGEST_SIZE; i++) {
+            sprintf(&current_sha_str[i * 2], "%02X", sha_256[i]);
+        }
+
+        char patch_sha_str[DELTA_OTA_UPGRADE_DIGEST_SIZE * 2 + 1] = {0};
+        for (int i = 0; i < DELTA_OTA_UPGRADE_DIGEST_SIZE; i++) {
+            sprintf(&patch_sha_str[i * 2], "%02X", digest[i]);
+        }
+
+        ESP_LOGE(TAG, "Invalid patch, the SHA256 of the current firmware (%s) differs from that in the patch header (%s).", current_sha_str, patch_sha_str);
         return ESP_ERR_INVALID_ARG;
     }
 
