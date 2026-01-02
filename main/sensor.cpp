@@ -73,7 +73,7 @@ void ZigbeeSensor::createOtaCluster(esp_zb_cluster_list_t* cluster_list) {
 
     esp_zb_zcl_ota_upgrade_client_variable_t variable_config = {};
     variable_config.timer_query = ESP_ZB_ZCL_OTA_UPGRADE_QUERY_TIMER_COUNT_DEF;
-    variable_config.hw_version = 1;
+    variable_config.hw_version = 3;
     variable_config.max_data_size = 223;
 
     uint16_t ota_upgrade_server_addr = 0xffff;
