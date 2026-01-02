@@ -27,6 +27,9 @@ esp_err_t ZigbeeHandlers::handle(esp_zb_core_action_callback_id_t callback_id, c
     case ESP_ZB_CORE_OTA_UPGRADE_QUERY_IMAGE_RESP_CB_ID:
         ret = queryImageResponse((esp_zb_zcl_ota_upgrade_query_image_resp_message_t*) message);
         break;
+    case ESP_ZB_CORE_CMD_DEFAULT_RESP_CB_ID:
+        // Gateway responding to our reports
+        break;
     default:
         ESP_LOGW(TAG, "Receive Zigbee action(0x%x) callback", callback_id);
         break;
