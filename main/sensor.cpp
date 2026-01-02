@@ -64,8 +64,8 @@ void ZigbeeSensor::createTimeCluster(esp_zb_cluster_list_t* cluster_list) {
     esp_zb_time_cluster_add_attr(time_cluster_server, ESP_ZB_ZCL_ATTR_TIME_TIME_STATUS_ID, (void *)&_time_status);
 
     esp_zb_attribute_list_t *time_cluster_client = esp_zb_zcl_attr_list_create(ESP_ZB_ZCL_CLUSTER_ID_TIME);
-    esp_zb_cluster_list_add_time_cluster(_cluster_list, time_cluster_server, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
-    esp_zb_cluster_list_add_time_cluster(_cluster_list, time_cluster_client, ESP_ZB_ZCL_CLUSTER_CLIENT_ROLE);
+    esp_zb_cluster_list_add_time_cluster(cluster_list, time_cluster_server, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
+    esp_zb_cluster_list_add_time_cluster(cluster_list, time_cluster_client, ESP_ZB_ZCL_CLUSTER_CLIENT_ROLE);
 }
 
 void ZigbeeSensor::createOtaCluster(esp_zb_cluster_list_t* cluster_list) {
@@ -83,7 +83,7 @@ void ZigbeeSensor::createOtaCluster(esp_zb_cluster_list_t* cluster_list) {
     esp_zb_ota_cluster_add_attr(ota_cluster, ESP_ZB_ZCL_ATTR_OTA_UPGRADE_SERVER_ADDR_ID, (void *)&ota_upgrade_server_addr);
     esp_zb_ota_cluster_add_attr(ota_cluster, ESP_ZB_ZCL_ATTR_OTA_UPGRADE_SERVER_ENDPOINT_ID, (void *)&ota_upgrade_server_ep);
 
-    esp_zb_cluster_list_add_ota_cluster(_cluster_list, ota_cluster, ESP_ZB_ZCL_CLUSTER_CLIENT_ROLE);
+    esp_zb_cluster_list_add_ota_cluster(cluster_list, ota_cluster, ESP_ZB_ZCL_CLUSTER_CLIENT_ROLE);
 }
 
 static void findOTAServer(esp_zb_zdp_status_t zdo_status, uint16_t addr, uint8_t endpoint, void *user_ctx) {
@@ -140,11 +140,11 @@ void ZigbeeSensor::zbAttributeSet(const esp_zb_zcl_set_attr_value_message_t *mes
         prefs.putUShort(NVS_OCC_TIMEOUT, newTimeout);
         prefs.end();
 
-        ESP_LOGI(TAG, "Occupancy timeout updated: %u seconds\n", newTimeout);
+        ESP_LOGI(TAG, "Occupancy timeout updated: %u seconds", newTimeout);
     } else if (message->info.cluster == ESP_ZB_ZCL_CLUSTER_ID_ON_OFF && message->attribute.id == ESP_ZB_ZCL_ATTR_ON_OFF_ON_OFF_ID) {
         bool newState = *(bool *)message->attribute.data.value;
         _on_light_change(newState);
-        ESP_LOGI(TAG, "On off updated: %s\n", newState ? "ON" : "OFF");
+        ESP_LOGI(TAG, "On off updated: %s", newState ? "ON" : "OFF");
     }
 }
 
@@ -190,6 +190,8 @@ ZigbeeSensor::ZigbeeSensor(uint8_t endpoint) : ZigbeeDevice(ESP_ZB_HA_SIMPLE_SEN
         .ota_upgrade_server_id = 0,
         .ota_image_upgrade_status = 0
     };
+
+    _cluster_list = createClusters();
 }
 
 bool ZigbeeSensor::setOccupancy(bool occupied) {
@@ -237,7 +239,7 @@ bool ZigbeeSensor::setOnOff(bool onOff) {
 bool ZigbeeSensor::report() {
     esp_zb_zcl_report_attr_cmd_t occupy_report_attr_cmd = {
         {
-            .dst_addr_u = 0,
+            .dst_addr_u = {},
             .dst_endpoint = 0,
             .src_endpoint = _endpoint
         },
@@ -250,7 +252,7 @@ bool ZigbeeSensor::report() {
 
     esp_zb_zcl_report_attr_cmd_t onoff_report_attr_cmd = {
         {
-            .dst_addr_u = 0,
+            .dst_addr_u = {},
             .dst_endpoint = 0,
             .src_endpoint = _endpoint
         },

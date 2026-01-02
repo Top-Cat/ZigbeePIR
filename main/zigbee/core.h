@@ -1,6 +1,8 @@
 #pragma once
 
 #include <list>
+#include <set>
+#include <vector>
 
 #include "esp_zigbee_type.h"
 
@@ -23,14 +25,31 @@ class ZigbeeCore {
 
         bool connected = false;
         bool started = false;
-    protected:
-        std::list<ZigbeeDevice *> ep_objects;
+
+        std::list<ZigbeeDevice *>* getDevices() {
+            return &ep_objects;
+        }
     private:
-        const char *TAG = "TC-ZC";
+        static const char *TAG;
+        std::list<ZigbeeDevice *> ep_objects;
 
         esp_zb_ep_list_t* _zb_ep_list;
         ZigbeeHandlers* handlers;
         uint32_t _primary_channel_mask;
+
+        static void bindingTableCb(const esp_zb_zdo_binding_table_info_t *table_info, void *user_ctx);
+
+        static inline const char *formatIEEEAddress(const esp_zb_ieee_addr_t addr) {
+            static char buf[24];
+            snprintf(buf, sizeof(buf), "%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X", addr[7], addr[6], addr[5], addr[4], addr[3], addr[2], addr[1], addr[0]);
+            return buf;
+        }
+
+        static inline const char *formatShortAddress(uint16_t addr) {
+            static char buf[7];
+            snprintf(buf, sizeof(buf), "0x%04X", addr);
+            return buf;
+        }
 };
 
 extern ZigbeeCore zigbeeCore;

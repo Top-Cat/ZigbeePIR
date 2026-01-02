@@ -6,6 +6,7 @@
 #include "ha/esp_zigbee_ha_standard.h"
 #include "main.h"
 #include "driver/gpio.h"
+#include "nvs_flash.h"
 
 #include "config.h"
 #include "sensor.h"
@@ -14,15 +15,15 @@
 
 ZigbeeSensor zbOccupancySensor = ZigbeeSensor(10);
 
-void IRAM_ATTR pirISR() {
+void IRAM_ATTR pirISR(void* data) {
     occupancy_changed = true;
 }
 
-void IRAM_ATTR buttonISR() {
+void IRAM_ATTR buttonISR(void* data) {
     button_pressed = true;
 }
 
-void IRAM_ATTR switchISR() {
+void IRAM_ATTR switchISR(void* data) {
     switch_pressed = true;
 }
 
@@ -54,6 +55,7 @@ void esp_zb_app_signal_handler(esp_zb_app_signal_t *signal_struct) {
     esp_err_t err_status = signal_struct->esp_err_status;   
     esp_zb_app_signal_type_t sig_type = (esp_zb_app_signal_type_t)*p_sg_p;
     esp_zb_zdo_signal_leave_params_t *leave_params = NULL;
+    esp_zb_zdo_signal_nwk_status_indication_params_s* nlme_params = NULL;
 
     // Router
     esp_zb_zdo_signal_device_update_params_t *dev_update_params = NULL;
@@ -116,9 +118,13 @@ void esp_zb_app_signal_handler(esp_zb_app_signal_t *signal_struct) {
             esp_restart();
         }
         break;
+    case ESP_ZB_NLME_STATUS_INDICATION:
+        nlme_params = (esp_zb_zdo_signal_nwk_status_indication_params_s *)esp_zb_app_signal_get_params(p_sg_p);
+        ESP_LOGW(TAG, "NLME status indication: %02x 0x%04x %02x", nlme_params->status, nlme_params->network_addr, nlme_params->unknown_command_id);
+        break;
     default:
-        ESP_LOGI(TAG, "ZDO signal: %s (0x%x), status: %s", esp_zb_zdo_signal_to_string(sig_type), sig_type,
-                 esp_err_to_name(err_status));
+        ESP_LOGI(TAG, "ZDO signal: %s (0x%x), status: %s (%d)", esp_zb_zdo_signal_to_string(sig_type), sig_type,
+                 esp_err_to_name(err_status), err_status);
         break;
     }
 }
@@ -166,6 +172,7 @@ void handleHeartbeat() {
         return;
 
     lastHeartbeat = esp_timer_get_time();
+
     if (zigbeeCore.connected) {
         zbOccupancySensor.report();
     } else {
@@ -196,13 +203,15 @@ void handleSwitch() {
 }
 
 static void main_task(void *pvParameters) {
-    handlePIR();
-    handleSwitch();
-    handleResetButton();
-    handleHeartbeat();
+    while (true) {
+        handlePIR();
+        handleSwitch();
+        handleResetButton();
+        handleHeartbeat();
 
-    // Can't sleep as we're a zigbee router
-    vTaskDelay(100 / portTICK_PERIOD_MS);
+        // Can't sleep as we're a zigbee router
+        vTaskDelay(100 / portTICK_PERIOD_MS);
+    }
 }
 
 extern "C" void app_main(void) {
@@ -225,6 +234,13 @@ extern "C" void app_main(void) {
     gpioConfig.mode = GPIO_MODE_OUTPUT;
     gpio_config(&gpioConfig);
 
+    gpio_install_isr_service(0);
+    gpio_isr_handler_add(BUTTON_PIN, buttonISR, NULL);
+    gpio_isr_handler_add(SWITCH_PIN, switchISR, NULL);
+    gpio_isr_handler_add(SENSOR_PIN, pirISR, NULL);
+
+    ESP_ERROR_CHECK(nvs_flash_init());
+
     zbOccupancySensor.init();
     zbOccupancySensor.onLightChange(setOnOff);
 
@@ -240,7 +256,7 @@ extern "C" void app_main(void) {
 
     zbOccupancySensor.requestOTA();
 
-    xTaskCreate(main_task, "Main", 4096, NULL, 4, NULL);
+    xTaskCreate(main_task, "Main", 8192, NULL, 4, NULL);
 
     if (gpio_get_level(SENSOR_PIN)) {
         occupancy_changed = true;

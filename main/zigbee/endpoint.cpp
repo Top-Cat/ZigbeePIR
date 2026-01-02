@@ -8,7 +8,6 @@
 
 ZigbeeDevice::ZigbeeDevice(esp_zb_ha_standard_devices_t deviceId, uint8_t endpoint) {
     _endpoint = endpoint;
-    _cluster_list = createClusters();
     _ep_config = {
         .endpoint = _endpoint,
         .app_profile_id = ESP_ZB_AF_HA_PROFILE_ID,
@@ -30,7 +29,6 @@ void ZigbeeDevice::zbReadTimeCluster(const esp_zb_zcl_attribute_t *attribute) {
         xSemaphoreGive(lock);
     }
 }
-
 
 bool ZigbeeDevice::setTime(tm time) {
     esp_zb_zcl_status_t ret = ESP_ZB_ZCL_STATUS_SUCCESS;
@@ -139,4 +137,54 @@ int32_t ZigbeeDevice::getTimezone(uint8_t endpoint, int32_t short_addr, esp_zb_i
     }
     setTimezone(_read_timezone);
     return _read_timezone;
+}
+
+void ZigbeeDevice::removeBoundDevice(uint8_t endpoint, esp_zb_ieee_addr_t ieee_addr) {
+    ESP_LOGI(
+        PTAG,
+        "Attempting to remove device with endpoint %d and IEEE address %02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x", endpoint, ieee_addr[7], ieee_addr[6], ieee_addr[5],
+        ieee_addr[4], ieee_addr[3], ieee_addr[2], ieee_addr[1], ieee_addr[0]
+    );
+
+    for (std::list<zb_device_params_t *>::iterator it = _bound_devices.begin(); it != _bound_devices.end(); ++it) {
+        if ((*it)->endpoint == endpoint && memcmp((*it)->ieee_addr, ieee_addr, sizeof(esp_zb_ieee_addr_t)) == 0) {
+            ESP_LOGI(PTAG, "Found matching device, removing it");
+            _bound_devices.erase(it);
+            if (_bound_devices.empty()) {
+                _is_bound = false;
+            }
+            return;
+        }
+    }
+    ESP_LOGW(PTAG, "No matching device found for removal");
+}
+
+void ZigbeeDevice::removeBoundDevice(zb_device_params_t *device) {
+    if (!device) {
+        ESP_LOGE(PTAG, "Invalid device parameters provided");
+        return;
+    }
+
+    ESP_LOGI(
+        PTAG,
+        "Attempting to remove device with endpoint %d, short address 0x%04x, IEEE address %02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x", device->endpoint,
+        device->short_addr, device->ieee_addr[7], device->ieee_addr[6], device->ieee_addr[5], device->ieee_addr[4], device->ieee_addr[3], device->ieee_addr[2],
+        device->ieee_addr[1], device->ieee_addr[0]
+    );
+
+    for (std::list<zb_device_params_t *>::iterator it = _bound_devices.begin(); it != _bound_devices.end(); ++it) {
+        bool endpoint_matches = ((*it)->endpoint == device->endpoint);
+        bool short_addr_matches = (device->short_addr != 0xFFFF && (*it)->short_addr == device->short_addr);
+        bool ieee_addr_matches = (memcmp((*it)->ieee_addr, device->ieee_addr, sizeof(esp_zb_ieee_addr_t)) == 0);
+
+        if (endpoint_matches && (short_addr_matches || ieee_addr_matches)) {
+            ESP_LOGI(PTAG, "Found matching device by %s, removing it", short_addr_matches ? "short address" : "IEEE address");
+            _bound_devices.erase(it);
+            if (_bound_devices.empty()) {
+                _is_bound = false;
+            }
+            return;
+        }
+    }
+    ESP_LOGW(PTAG, "No matching device found for removal");
 }
