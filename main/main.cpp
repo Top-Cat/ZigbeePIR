@@ -120,11 +120,11 @@ void esp_zb_app_signal_handler(esp_zb_app_signal_t *signal_struct) {
         break;
     case ESP_ZB_NLME_STATUS_INDICATION:
         nlme_params = (esp_zb_zdo_signal_nwk_status_indication_params_s *)esp_zb_app_signal_get_params(p_sg_p);
-        ESP_LOGW(TAG, "NLME status indication: %02x 0x%04x %02x", nlme_params->status, nlme_params->network_addr, nlme_params->unknown_command_id);
+        ESP_LOGV(TAG, "NLME status indication: %02x 0x%04x %02x", nlme_params->status, nlme_params->network_addr, nlme_params->unknown_command_id);
         break;
     default:
-        ESP_LOGI(TAG, "ZDO signal: %s (0x%x), status: %s (%d)", esp_zb_zdo_signal_to_string(sig_type), sig_type,
-                 esp_err_to_name(err_status), err_status);
+        ESP_LOGI(TAG, "ZDO signal: %s (0x%x), status: %s", esp_zb_zdo_signal_to_string(sig_type), sig_type,
+                 esp_err_to_name(err_status));
         break;
     }
 }

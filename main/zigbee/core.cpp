@@ -28,7 +28,6 @@ ZigbeeCore::ZigbeeCore() {
 }
 
 esp_err_t ZigbeeCore::handle(esp_zb_core_action_callback_id_t callback_id, const void *message) {
-    ESP_LOGI(TAG, "zb_action_handler");
     return handlers->handle(callback_id, message);
 }
 
