@@ -168,17 +168,6 @@ void handleResetButton() {
     }
 }
 
-void handleTemperature() {
-    ESP_ERROR_CHECK(ds18b20_trigger_temperature_conversion_for_all(bus));
-
-    float averageTemp = 0, currentTemp = 0;
-    for (uint8_t i = 0; i < sensorCount; i++) {
-        ESP_ERROR_CHECK(ds18b20_get_temperature(temp[i], &currentTemp));
-        averageTemp += (currentTemp / sensorCount);
-    }
-    zbOccupancySensor.setTemperature(averageTemp);
-}
-
 void handleHeartbeat() {
     if (esp_timer_get_time() - lastHeartbeat <= HEARTBEAT_INTERVAL)
         return;
@@ -219,52 +208,6 @@ static void main_task(void *pvParameters) {
 
         // Can't sleep as we're a zigbee router
         vTaskDelay(100 / portTICK_PERIOD_MS);
-    }
-}
-
-void setupTemp() {
-    onewire_bus_config_t busConfig = {
-        .bus_gpio_num = TEMP_PIN,
-        .flags = {
-            .en_pull_up = false
-        }
-    };
-    onewire_bus_rmt_config_t rmtConfig = {
-        .max_rx_bytes = 10
-    };
-
-    ESP_ERROR_CHECK(onewire_new_bus_rmt(&busConfig, &rmtConfig, &bus));
-
-    onewire_device_iter_handle_t iter = NULL;
-    ESP_ERROR_CHECK(onewire_new_device_iter(bus, &iter));
-
-    onewire_device_t next;
-    esp_err_t result = ESP_OK;
-    do {
-        result = onewire_device_iter_get_next(iter, &next);
-        if (result == ESP_OK) {
-            ds18b20_config_t dsCfg = {};
-            onewire_device_address_t addr;
-
-            if (ds18b20_new_device_from_enumeration(&next, &dsCfg, &temp[sensorCount]) == ESP_OK) {
-                ds18b20_get_device_address(temp[sensorCount], &addr);
-                printf("Found sensor[%d], address: %016llX\n", sensorCount, addr);
-                sensorCount++;
-            } else {
-                printf("Found unknown device, address: %016llX\n", next.address);
-            }
-        }
-    } while (result != ESP_ERR_NOT_FOUND);
-    ESP_ERROR_CHECK(onewire_del_device_iter(iter));
-    printf("Found %d temperature sensors\n", sensorCount);
-}
-
-static void sensor_task(void *pvParameters) {
-    setupTemp();
-
-    while (true) {
-        handleTemperature();
-        vTaskDelay(5000 / portTICK_PERIOD_MS);
     }
 }
 
