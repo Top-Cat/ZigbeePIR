@@ -14,9 +14,19 @@ void light_driver_init(bool power) {
     led_strip_config_t led_strip_conf = {
         .strip_gpio_num = CONFIG_EXAMPLE_STRIP_LED_GPIO,
         .max_leds = CONFIG_EXAMPLE_STRIP_LED_NUMBER,
+        .led_model = LED_MODEL_WS2812,
+        .color_component_format = LED_STRIP_COLOR_COMPONENT_FMT_RGB,
+        .flags = {
+            .invert_out = false
+        }
     };
     led_strip_rmt_config_t rmt_conf = {
+        .clk_src = RMT_CLK_SRC_DEFAULT,
         .resolution_hz = 10 * 1000 * 1000, // 10MHz
+        .mem_block_symbols = 48,
+        .flags = {
+            .with_dma = false
+        }
     };
     ESP_ERROR_CHECK(led_strip_new_rmt_device(&led_strip_conf, &rmt_conf, &s_led_strip));
     light_driver_set_power(power);
