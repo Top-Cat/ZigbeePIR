@@ -27,6 +27,7 @@ class ZigbeeSensor : public ZigbeeDevice {
         const char* TAG = "TC-ZBS";
         const char* manufacturer_name = "TC";
         const char* model_identifier = "Kitchen PIR Sensor";
+        bool reportTemperature = false;
 
         Preferences prefs;
 

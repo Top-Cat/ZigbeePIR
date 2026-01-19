@@ -249,7 +249,6 @@ bool ZigbeeSensor::setOnOff(bool onOff) {
 
 bool ZigbeeSensor::setTemperature(float temperature) {
     int16_t zigbeeTemp = temperature * 100;
-    printf("New temperature: %d\n", zigbeeTemp);
 
     esp_zb_zcl_status_t ret = ESP_ZB_ZCL_STATUS_SUCCESS;
 
@@ -264,11 +263,11 @@ bool ZigbeeSensor::setTemperature(float temperature) {
     );
     esp_zb_lock_release();
 
-    if (ret != ESP_ZB_ZCL_STATUS_SUCCESS) {
+    reportTemperature = ret == ESP_ZB_ZCL_STATUS_SUCCESS;
+    if (!reportTemperature) {
         ESP_LOGE(TAG, "Failed to set temperature: 0x%x: %s", ret, esp_zb_zcl_status_to_name(ret));
-        return false;
     }
-    return true;
+    return reportTemperature;
 }
 
 bool ZigbeeSensor::report() {
@@ -298,10 +297,27 @@ bool ZigbeeSensor::report() {
         ESP_ZB_ZCL_ATTR_ON_OFF_ON_OFF_ID
     };
 
+    esp_zb_zcl_report_attr_cmd_t temp_report_attr_cmd = {
+        {
+            .dst_addr_u = {},
+            .dst_endpoint = 0,
+            .src_endpoint = _endpoint
+        },
+        ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT,
+        ESP_ZB_ZCL_CLUSTER_ID_TEMP_MEASUREMENT,
+        {0, ESP_ZB_ZCL_CMD_DIRECTION_TO_CLI, 0},
+        ESP_ZB_ZCL_ATTR_NON_MANUFACTURER_SPECIFIC,
+        ESP_ZB_ZCL_ATTR_TEMP_MEASUREMENT_VALUE_ID
+    };
+
     esp_zb_lock_acquire(portMAX_DELAY);
-    esp_err_t ret = esp_zb_zcl_report_attr_cmd_req(&occupy_report_attr_cmd);
-    esp_err_t ret2 = esp_zb_zcl_report_attr_cmd_req(&onoff_report_attr_cmd);
+    esp_err_t ret, ret2, ret3 = ESP_OK;
+    ret = esp_zb_zcl_report_attr_cmd_req(&occupy_report_attr_cmd);
+    ret2 = esp_zb_zcl_report_attr_cmd_req(&onoff_report_attr_cmd);
+    if (reportTemperature) {
+        ret3 = esp_zb_zcl_report_attr_cmd_req(&temp_report_attr_cmd);
+    }
     esp_zb_lock_release();
 
-    return ret == ESP_OK && ret2 == ESP_OK;
+    return ret == ESP_OK && ret2 == ESP_OK && ret3 == ESP_OK;
 }

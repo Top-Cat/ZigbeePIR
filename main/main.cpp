@@ -168,7 +168,9 @@ void handleResetButton() {
     }
 }
 
-void updateTemperature() {
+void handleTemperature() {
+    ESP_ERROR_CHECK(ds18b20_trigger_temperature_conversion_for_all(bus));
+
     float averageTemp = 0, currentTemp = 0;
     for (uint8_t i = 0; i < sensorCount; i++) {
         ESP_ERROR_CHECK(ds18b20_get_temperature(temp[i], &currentTemp));
@@ -180,8 +182,6 @@ void updateTemperature() {
 void handleHeartbeat() {
     if (esp_timer_get_time() - lastHeartbeat <= HEARTBEAT_INTERVAL)
         return;
-
-    updateTemperature();
 
     lastHeartbeat = esp_timer_get_time();
 
@@ -226,7 +226,7 @@ void setupTemp() {
     onewire_bus_config_t busConfig = {
         .bus_gpio_num = TEMP_PIN,
         .flags = {
-            .en_pull_up = true
+            .en_pull_up = false
         }
     };
     onewire_bus_rmt_config_t rmtConfig = {
@@ -248,15 +248,24 @@ void setupTemp() {
 
             if (ds18b20_new_device_from_enumeration(&next, &dsCfg, &temp[sensorCount]) == ESP_OK) {
                 ds18b20_get_device_address(temp[sensorCount], &addr);
-                printf("Found sensor[%d], address: %016llX", sensorCount, addr);
+                printf("Found sensor[%d], address: %016llX\n", sensorCount, addr);
                 sensorCount++;
             } else {
-                printf("Found unknown device, address: %016llX", next.address);
+                printf("Found unknown device, address: %016llX\n", next.address);
             }
         }
     } while (result != ESP_ERR_NOT_FOUND);
     ESP_ERROR_CHECK(onewire_del_device_iter(iter));
     printf("Found %d temperature sensors\n", sensorCount);
+}
+
+static void sensor_task(void *pvParameters) {
+    setupTemp();
+
+    while (true) {
+        handleTemperature();
+        vTaskDelay(5000 / portTICK_PERIOD_MS);
+    }
 }
 
 extern "C" void app_main(void) {
@@ -274,11 +283,12 @@ extern "C" void app_main(void) {
     gpioConfig.pull_up_en = GPIO_PULLUP_DISABLE;
     gpio_config(&gpioConfig);
 
-    gpioConfig.pin_bit_mask = (1ULL << LEDA_PIN) | (1ULL << LEDB_PIN) | (1ULL << LEDC_PIN) | (1ULL << WS2812_PIN);
+    gpioConfig.pin_bit_mask = (1ULL << LEDA_PIN) | (1ULL << LEDB_PIN) | (1ULL << LEDC_PIN) | (1ULL << WS2812_PIN) | (1ULL << TEMP_PIN);
     gpioConfig.intr_type = GPIO_INTR_DISABLE;
     gpioConfig.mode = GPIO_MODE_OUTPUT;
     gpio_config(&gpioConfig);
 
+    gpio_set_level(TEMP_PIN, 1);
     gpio_set_level(LEDA_PIN, 0);
     gpio_set_level(LEDB_PIN, 0);
     gpio_set_level(LEDC_PIN, 0);
@@ -287,8 +297,6 @@ extern "C" void app_main(void) {
     gpio_isr_handler_add(BUTTON_PIN, buttonISR, NULL);
     gpio_isr_handler_add(SWITCH_PIN, switchISR, NULL);
     gpio_isr_handler_add(SENSOR_PIN, pirISR, NULL);
-
-    setupTemp();
 
     ESP_ERROR_CHECK(nvs_flash_init());
 
@@ -309,6 +317,7 @@ extern "C" void app_main(void) {
     zbOccupancySensor.requestOTA();
 
     xTaskCreate(main_task, "Main", 8192, NULL, 4, NULL);
+    xTaskCreate(sensor_task, "Sensor", 8192, NULL, 4, NULL);
 
     if (gpio_get_level(SENSOR_PIN)) {
         occupancy_changed = true;
