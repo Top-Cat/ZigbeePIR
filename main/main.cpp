@@ -28,13 +28,14 @@ void IRAM_ATTR switchISR(void* data) {
 }
 
 void setOnOff(bool onOff) {
-    gpio_set_level(LED_PIN, onOff);
+    gpio_set_level(LEDC_PIN, onOff);
 }
 
 // TODO: Replace LED with WS2812B driver
 // TODO: Seperate occupancy timeout and light timeout
 void setOccupied(bool newVal) {
   occupancy_state = newVal;
+  gpio_set_level(LEDB_PIN, newVal);
   setOnOff(occupancy_state);
   zbOccupancySensor.setOccupancy(occupancy_state);
   zbOccupancySensor.setOnOff(occupancy_state);
@@ -69,7 +70,7 @@ void esp_zb_app_signal_handler(esp_zb_app_signal_t *signal_struct) {
     case ESP_ZB_BDB_SIGNAL_DEVICE_REBOOT:
         if (err_status == ESP_OK) {
             ESP_LOGI(TAG, "Deferred driver initialization %s", deferred_driver_init() ? "failed" : "successful");
-            ESP_LOGI(TAG, "Device started up in %s factory-reset mode", esp_zb_bdb_is_factory_new() ? "" : "non");
+            ESP_LOGI(TAG, "Device started up in %sfactory-reset mode", esp_zb_bdb_is_factory_new() ? "" : "non-");
             if (esp_zb_bdb_is_factory_new()) {
                 ESP_LOGI(TAG, "Start network steering");
                 esp_zb_bdb_start_top_level_commissioning(ESP_ZB_BDB_MODE_NETWORK_STEERING);
@@ -167,9 +168,20 @@ void handleResetButton() {
     }
 }
 
+void updateTemperature() {
+    float averageTemp = 0, currentTemp = 0;
+    for (uint8_t i = 0; i < sensorCount; i++) {
+        ESP_ERROR_CHECK(ds18b20_get_temperature(temp[i], &currentTemp));
+        averageTemp += (currentTemp / sensorCount);
+    }
+    zbOccupancySensor.setTemperature(averageTemp);
+}
+
 void handleHeartbeat() {
     if (esp_timer_get_time() - lastHeartbeat <= HEARTBEAT_INTERVAL)
         return;
+
+    updateTemperature();
 
     lastHeartbeat = esp_timer_get_time();
 
@@ -186,10 +198,6 @@ void handleSwitch() {
         return;
 
     switch_pressed = false;
-
-    // De-bounce, went low, still low
-    if (gpio_get_level(SWITCH_PIN))
-        return;
 
     ESP_LOGI(TAG, "Switch pressed");
 
@@ -214,13 +222,50 @@ static void main_task(void *pvParameters) {
     }
 }
 
+void setupTemp() {
+    onewire_bus_config_t busConfig = {
+        .bus_gpio_num = TEMP_PIN,
+        .flags = {
+            .en_pull_up = true
+        }
+    };
+    onewire_bus_rmt_config_t rmtConfig = {
+        .max_rx_bytes = 10
+    };
+
+    ESP_ERROR_CHECK(onewire_new_bus_rmt(&busConfig, &rmtConfig, &bus));
+
+    onewire_device_iter_handle_t iter = NULL;
+    ESP_ERROR_CHECK(onewire_new_device_iter(bus, &iter));
+
+    onewire_device_t next;
+    esp_err_t result = ESP_OK;
+    do {
+        result = onewire_device_iter_get_next(iter, &next);
+        if (result == ESP_OK) {
+            ds18b20_config_t dsCfg = {};
+            onewire_device_address_t addr;
+
+            if (ds18b20_new_device_from_enumeration(&next, &dsCfg, &temp[sensorCount]) == ESP_OK) {
+                ds18b20_get_device_address(temp[sensorCount], &addr);
+                printf("Found sensor[%d], address: %016llX", sensorCount, addr);
+                sensorCount++;
+            } else {
+                printf("Found unknown device, address: %016llX", next.address);
+            }
+        }
+    } while (result != ESP_ERR_NOT_FOUND);
+    ESP_ERROR_CHECK(onewire_del_device_iter(iter));
+    printf("Found %d temperature sensors\n", sensorCount);
+}
+
 extern "C" void app_main(void) {
     gpio_config_t gpioConfig = {
         .pin_bit_mask = (1ULL << BUTTON_PIN) | (1ULL << SWITCH_PIN),
         .mode = GPIO_MODE_INPUT,
         .pull_up_en = GPIO_PULLUP_ENABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
-        .intr_type = GPIO_INTR_NEGEDGE
+        .intr_type = GPIO_INTR_ANYEDGE
     };
     gpio_config(&gpioConfig);
 
@@ -229,15 +274,21 @@ extern "C" void app_main(void) {
     gpioConfig.pull_up_en = GPIO_PULLUP_DISABLE;
     gpio_config(&gpioConfig);
 
-    gpioConfig.pin_bit_mask = (1ULL << LED_PIN) | (1ULL << WS2812_PIN);
+    gpioConfig.pin_bit_mask = (1ULL << LEDA_PIN) | (1ULL << LEDB_PIN) | (1ULL << LEDC_PIN) | (1ULL << WS2812_PIN);
     gpioConfig.intr_type = GPIO_INTR_DISABLE;
     gpioConfig.mode = GPIO_MODE_OUTPUT;
     gpio_config(&gpioConfig);
+
+    gpio_set_level(LEDA_PIN, 0);
+    gpio_set_level(LEDB_PIN, 0);
+    gpio_set_level(LEDC_PIN, 0);
 
     gpio_install_isr_service(0);
     gpio_isr_handler_add(BUTTON_PIN, buttonISR, NULL);
     gpio_isr_handler_add(SWITCH_PIN, switchISR, NULL);
     gpio_isr_handler_add(SENSOR_PIN, pirISR, NULL);
+
+    setupTemp();
 
     ESP_ERROR_CHECK(nvs_flash_init());
 
@@ -254,6 +305,7 @@ extern "C" void app_main(void) {
     }
     printf("\n");
 
+    gpio_set_level(LEDA_PIN, 1);
     zbOccupancySensor.requestOTA();
 
     xTaskCreate(main_task, "Main", 8192, NULL, 4, NULL);

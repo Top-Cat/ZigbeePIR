@@ -68,6 +68,11 @@ void ZigbeeSensor::createTimeCluster(esp_zb_cluster_list_t* cluster_list) {
     esp_zb_cluster_list_add_time_cluster(cluster_list, time_cluster_client, ESP_ZB_ZCL_CLUSTER_CLIENT_ROLE);
 }
 
+void ZigbeeSensor::createTemperatureCluster(esp_zb_cluster_list_t* cluster_list) {
+    esp_zb_attribute_list_t *temp_cluster = esp_zb_temperature_meas_cluster_create(&temperature_cfg);
+    esp_zb_cluster_list_add_temperature_meas_cluster(cluster_list, temp_cluster, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
+}
+
 void ZigbeeSensor::createOtaCluster(esp_zb_cluster_list_t* cluster_list) {
     esp_zb_attribute_list_t *ota_cluster = esp_zb_ota_cluster_create(&ota_cluster_cfg);
 
@@ -122,6 +127,7 @@ esp_zb_cluster_list_t* ZigbeeSensor::createClusters() {
     createOnOffCluster(cluster_list);
     createOtaCluster(cluster_list);
     createTimeCluster(cluster_list);
+    createTemperatureCluster(cluster_list);
 
     return cluster_list;
 }
@@ -190,6 +196,11 @@ ZigbeeSensor::ZigbeeSensor(uint8_t endpoint) : ZigbeeDevice(ESP_ZB_HA_SIMPLE_SEN
         .ota_upgrade_server_id = 0,
         .ota_image_upgrade_status = 0
     };
+    temperature_cfg = {
+        .measured_value = (short) 0x8000,
+        .min_value = -5000,
+        .max_value = 10000
+    };
 
     _cluster_list = createClusters();
 }
@@ -231,6 +242,30 @@ bool ZigbeeSensor::setOnOff(bool onOff) {
 
     if (ret != ESP_ZB_ZCL_STATUS_SUCCESS) {
         ESP_LOGE(TAG, "Failed to set on off: 0x%x: %s", ret, esp_zb_zcl_status_to_name(ret));
+        return false;
+    }
+    return true;
+}
+
+bool ZigbeeSensor::setTemperature(float temperature) {
+    int16_t zigbeeTemp = temperature * 100;
+    printf("New temperature: %d\n", zigbeeTemp);
+
+    esp_zb_zcl_status_t ret = ESP_ZB_ZCL_STATUS_SUCCESS;
+
+    esp_zb_lock_acquire(portMAX_DELAY);
+    ret = esp_zb_zcl_set_attribute_val(
+        _endpoint,
+        ESP_ZB_ZCL_CLUSTER_ID_TEMP_MEASUREMENT,
+        ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
+        ESP_ZB_ZCL_ATTR_TEMP_MEASUREMENT_VALUE_ID,
+        &zigbeeTemp,
+        false
+    );
+    esp_zb_lock_release();
+
+    if (ret != ESP_ZB_ZCL_STATUS_SUCCESS) {
+        ESP_LOGE(TAG, "Failed to set temperature: 0x%x: %s", ret, esp_zb_zcl_status_to_name(ret));
         return false;
     }
     return true;

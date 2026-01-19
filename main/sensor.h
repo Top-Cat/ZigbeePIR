@@ -16,6 +16,7 @@ class ZigbeeSensor : public ZigbeeDevice {
 
         void onLightChange(void (*callback)(bool));
         bool setOccupancy(bool occupied);
+        bool setTemperature(float temperature);
         bool setOnOff(bool onOff);
         void init();
         uint16_t getTimeout();
@@ -34,6 +35,7 @@ class ZigbeeSensor : public ZigbeeDevice {
         esp_zb_occupancy_sensing_cluster_cfg_t occupancy_meas_cfg;
         esp_zb_on_off_cluster_cfg_t on_off_cfg;
         esp_zb_ota_cluster_cfg_t ota_cluster_cfg;
+        esp_zb_temperature_meas_cluster_cfg_t temperature_cfg;
 
         esp_zb_cluster_list_t* createClusters() override;
         void createBasicCluster(esp_zb_cluster_list_t* cluster_list);
@@ -42,6 +44,7 @@ class ZigbeeSensor : public ZigbeeDevice {
         void createOnOffCluster(esp_zb_cluster_list_t* cluster_list);
         void createOtaCluster(esp_zb_cluster_list_t* cluster_list);
         void createTimeCluster(esp_zb_cluster_list_t* cluster_list);
+        void createTemperatureCluster(esp_zb_cluster_list_t* cluster_list);
 
         void (*_on_light_change)(bool);
 };
