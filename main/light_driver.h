@@ -1,25 +1,22 @@
-#pragma once
+#include "led_strip.h"
 
-#include <stdbool.h>
+void lightTask(void *pvParameters);
+void setLevels(uint8_t amber, uint8_t warm_white, uint8_t cool_white, uint16_t count);
 
-/* light intensity level */
-#define LIGHT_DEFAULT_ON  1
-#define LIGHT_DEFAULT_OFF 0
+class LightDriver {
+    public:
+        void init();
+        void setLevels(uint8_t amber, uint8_t warm_white, uint8_t cool_white, uint16_t count);
+        void setPowerTarget(uint8_t target);
+        void task();
+    private:
+        uint8_t powerTarget = 0;
+        uint16_t driverLedCount = 1;
 
-/* LED strip configuration */
-#define CONFIG_EXAMPLE_STRIP_LED_GPIO   8
-#define CONFIG_EXAMPLE_STRIP_LED_NUMBER 1
+        led_strip_handle_t s_led_strip;
+        float s_warm = 1, s_cold = 1, s_amber = 1;
 
-/**
-* @brief Set light power (on/off).
-*
-* @param  power  The light power to be set
-*/
-void light_driver_set_power(bool power);
+        void setPower(uint8_t power);
+};
 
-/**
-* @brief color light driver init, be invoked where you want to use color light
-*
-* @param power power on/off
-*/
-void light_driver_init(bool power);
+extern LightDriver ledDriver;

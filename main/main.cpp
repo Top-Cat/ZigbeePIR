@@ -28,23 +28,21 @@ void IRAM_ATTR switchISR(void* data) {
 }
 
 void setOnOff(bool onOff) {
-    gpio_set_level(LEDC_PIN, onOff);
+    ledDriver.setPowerTarget(onOff ? 255 : 0);
 }
 
-// TODO: Replace LED with WS2812B driver
 // TODO: Seperate occupancy timeout and light timeout
 void setOccupied(bool newVal) {
-  occupancy_state = newVal;
-  gpio_set_level(LEDB_PIN, newVal);
-  setOnOff(occupancy_state);
-  zbOccupancySensor.setOccupancy(occupancy_state);
-  zbOccupancySensor.setOnOff(occupancy_state);
-  zbOccupancySensor.report();
+    occupancy_state = newVal;
+    gpio_set_level(LEDB_PIN, newVal);
+    setOnOff(occupancy_state);
+    zbOccupancySensor.setOccupancy(occupancy_state);
+    zbOccupancySensor.setOnOff(occupancy_state);
+    zbOccupancySensor.report();
 }
 
 static esp_err_t deferred_driver_init(void) {
-    light_driver_init(LIGHT_DEFAULT_OFF);
-    return ESP_OK;
+    return xTaskCreate(lightTask, "light_driver", 8192, NULL, 4, NULL);
 }
 
 static void bdb_start_top_level_commissioning_cb(uint8_t mode_mask) {
@@ -243,8 +241,9 @@ extern "C" void app_main(void) {
 
     ESP_ERROR_CHECK(nvs_flash_init());
 
-    zbOccupancySensor.init();
     zbOccupancySensor.onLightChange(setOnOff);
+    zbOccupancySensor.onLevelChange(setLevels);
+    zbOccupancySensor.init();
 
     zigbeeCore.registerEndpoint(&zbOccupancySensor);
     zigbeeCore.start();
@@ -257,6 +256,7 @@ extern "C" void app_main(void) {
     printf("\n");
 
     gpio_set_level(LEDA_PIN, 1);
+    zbOccupancySensor.onConnect();
     zbOccupancySensor.requestOTA();
 
     xTaskCreate(main_task, "Main", 8192, NULL, 4, NULL);
