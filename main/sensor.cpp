@@ -256,7 +256,7 @@ void ZigbeeSensor::init() {
 
 void ZigbeeSensor::onConnect() {
     esp_zb_lock_acquire(portMAX_DELAY);
-    uint8_t val = amberLevel;
+    uint16_t val = amberLevel;
     esp_zb_zcl_set_manufacturer_attribute_val(
         _endpoint,
         MS_WHITE_CLUSTER_ID,
@@ -293,6 +293,15 @@ void ZigbeeSensor::onConnect() {
         ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
         MANUFACTURER_CODE,
         ATTR_LED_COUNT_ID,
+        &val,
+        false
+    );
+    val = occupancyTimeoutSec;
+    esp_zb_zcl_set_attribute_val(
+        _endpoint,
+        ESP_ZB_ZCL_CLUSTER_ID_OCCUPANCY_SENSING,
+        ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
+        ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_PIR_OCC_TO_UNOCC_DELAY_ID,
         &val,
         false
     );
