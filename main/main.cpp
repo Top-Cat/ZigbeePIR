@@ -222,10 +222,12 @@ extern "C" void app_main(void) {
     gpioConfig.pin_bit_mask = 1ULL << SENSOR_PIN;
     gpioConfig.intr_type = GPIO_INTR_ANYEDGE;
     gpioConfig.pull_up_en = GPIO_PULLUP_DISABLE;
+    gpioConfig.pull_down_en = GPIO_PULLDOWN_ENABLE;
     gpio_config(&gpioConfig);
 
     gpioConfig.pin_bit_mask = (1ULL << LEDA_PIN) | (1ULL << LEDB_PIN) | (1ULL << LEDC_PIN) | (1ULL << WS2812_PIN) | (1ULL << TEMP_PIN);
     gpioConfig.intr_type = GPIO_INTR_DISABLE;
+    gpioConfig.pull_down_en = GPIO_PULLDOWN_DISABLE;
     gpioConfig.mode = GPIO_MODE_OUTPUT;
     gpio_config(&gpioConfig);
 
