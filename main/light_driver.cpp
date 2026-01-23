@@ -21,8 +21,27 @@ void LightDriver::setLevels(uint8_t amber, uint8_t warm_white, uint8_t cool_whit
     driverLedCount = count;
 }
 
-void setLevels(uint8_t amber, uint8_t warm_white, uint8_t cool_white, uint16_t count) {
+void LightDriver::setAnimation(FadeAnimation _animation) {
+    animation = _animation;
+}
+
+void setLevels(uint8_t amber, uint8_t warm_white, uint8_t cool_white, uint16_t count, uint8_t animation) {
     ledDriver.setLevels(amber, warm_white, cool_white, count);
+    ledDriver.setAnimation((FadeAnimation) animation);
+}
+
+const double &min(const double &a, const double &b) {
+    return (b < a) ? b : a;
+}
+
+const double &max(const double &a, const double &b) {
+    return (b > a) ? b : a;
+}
+
+uint8_t LightDriver::calculateFromEnds(uint8_t power, uint8_t i) {
+    double travel = (power / 255.0) * ((driverLedCount / 2.0) + fadeWidth);
+    double delta = travel - min(i, driverLedCount - 1 - i);
+    return max(0.0, min(255.0, 255.0 * delta / fadeWidth));
 }
 
 void LightDriver::setPower(uint8_t power) {
@@ -30,7 +49,21 @@ void LightDriver::setPower(uint8_t power) {
     ESP_ERROR_CHECK(ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0));
 
     for (uint16_t i = 0; i < driverLedCount; i++) {
-        ESP_ERROR_CHECK(led_strip_set_pixel(s_led_strip, i, s_cold * power, s_amber * power, s_warm * power));
+        uint8_t newPower = power;
+        switch (animation) {
+            case FadeAnimation::FROM_ENDS:
+                newPower = calculateFromEnds(power, i);
+                break;
+            case FadeAnimation::ROWS:
+                newPower = i % 2 == 0 ?
+                    (power > 128 ? 255 : power * 2) :
+                    (power > 128 ? (power - 128) * 2 : 0);
+                break;
+            case FadeAnimation::BASIC:
+            default:
+                break;
+        }
+        ESP_ERROR_CHECK(led_strip_set_pixel(s_led_strip, i, s_cold * newPower, s_amber * newPower, s_warm * newPower));
     }
     ESP_ERROR_CHECK(led_strip_refresh(s_led_strip));
 }

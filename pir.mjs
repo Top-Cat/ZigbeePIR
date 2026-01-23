@@ -1,6 +1,5 @@
 import {Zcl} from "zigbee-herdsman";
 import * as m from 'zigbee-herdsman-converters/lib/modernExtend';
-import * as exposes from 'zigbee-herdsman-converters/lib/exposes';
 
 export default {
     zigbeeModel: ['Kitchen PIR Sensor'],
@@ -23,6 +22,7 @@ export default {
                 'warm_white': { ID: 0x0002, type: Zcl.DataType.UINT8, write: true, max: 0xff },
                 'cool_white': { ID: 0x0003, type: Zcl.DataType.UINT8, write: true, max: 0xff },
                 'count': { ID: 0x0010, type: Zcl.DataType.UINT16, write: true, max: 0xffff },
+                'animation': { ID: 0x0011, type: Zcl.DataType.ENUM8, write: true, max: 0xff },
             },
             commands: {},
             commandsResponse: {},
@@ -58,6 +58,17 @@ export default {
             attribute: 'count',
             valueMin: 0,
             valueMax: 500,
+        }),
+        m.enumLookup({
+            name: 'animation',
+            label: 'Light Animation',
+            cluster: 'tcSpecificLed',
+            attribute: 'animation',
+            lookup: {
+                'Basic': 0x00,
+                'Rows': 0x01,
+                'From ends': 0x02
+            }
         })
     ],
     ota: true

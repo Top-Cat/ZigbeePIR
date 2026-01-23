@@ -75,12 +75,12 @@ void ZigbeeSensor::createTemperatureCluster(esp_zb_cluster_list_t* cluster_list)
 }
 
 void ZigbeeSensor::createCustomCluster(esp_zb_cluster_list_t* cluster_list) {
-    esp_zb_attribute_list_t *custom_cluster = esp_zb_zcl_attr_list_create(MS_WHITE_CLUSTER_ID);
+    esp_zb_attribute_list_t *custom_cluster = esp_zb_zcl_attr_list_create(MS_LED_CLUSTER_ID);
 
     uint16_t val = 0;
     esp_zb_cluster_add_manufacturer_attr(
         custom_cluster,
-        MS_WHITE_CLUSTER_ID,
+        MS_LED_CLUSTER_ID,
         ATTR_AMBER_LEVEL_ID,
         MANUFACTURER_CODE,
         ESP_ZB_ZCL_ATTR_TYPE_U8,
@@ -90,7 +90,7 @@ void ZigbeeSensor::createCustomCluster(esp_zb_cluster_list_t* cluster_list) {
 
     esp_zb_cluster_add_manufacturer_attr(
         custom_cluster,
-        MS_WHITE_CLUSTER_ID,
+        MS_LED_CLUSTER_ID,
         ATTR_WARM_WHITE_LEVEL_ID,
         MANUFACTURER_CODE,
         ESP_ZB_ZCL_ATTR_TYPE_U8,
@@ -100,7 +100,7 @@ void ZigbeeSensor::createCustomCluster(esp_zb_cluster_list_t* cluster_list) {
 
     esp_zb_cluster_add_manufacturer_attr(
         custom_cluster,
-        MS_WHITE_CLUSTER_ID,
+        MS_LED_CLUSTER_ID,
         ATTR_COOL_WHITE_LEVEL_ID,
         MANUFACTURER_CODE,
         ESP_ZB_ZCL_ATTR_TYPE_U8,
@@ -110,10 +110,20 @@ void ZigbeeSensor::createCustomCluster(esp_zb_cluster_list_t* cluster_list) {
 
     esp_zb_cluster_add_manufacturer_attr(
         custom_cluster,
-        MS_WHITE_CLUSTER_ID,
+        MS_LED_CLUSTER_ID,
         ATTR_LED_COUNT_ID,
         MANUFACTURER_CODE,
         ESP_ZB_ZCL_ATTR_TYPE_U16,
+        ESP_ZB_ZCL_ATTR_ACCESS_READ_WRITE,
+        &val
+    );
+
+    esp_zb_cluster_add_manufacturer_attr(
+        custom_cluster,
+        MS_LED_CLUSTER_ID,
+        ATTR_ANIMATION_ID,
+        MANUFACTURER_CODE,
+        ESP_ZB_ZCL_ATTR_TYPE_8BIT_ENUM,
         ESP_ZB_ZCL_ATTR_ACCESS_READ_WRITE,
         &val
     );
@@ -201,6 +211,8 @@ void ZigbeeSensor::zbAttributeSet(const esp_zb_zcl_set_attr_value_message_t *mes
                 manualTimeoutSec = newTimeout;
                 prefs.putUShort(NVS_MAN_TIMEOUT, newTimeout);
                 break;
+            default:
+                printf("Unknown occupancy cluster update: %d\n", message->attribute.id);
         }
 
         prefs.end();
@@ -210,7 +222,7 @@ void ZigbeeSensor::zbAttributeSet(const esp_zb_zcl_set_attr_value_message_t *mes
         bool newState = *(bool *)message->attribute.data.value;
         _on_light_change(newState);
         ESP_LOGI(TAG, "On off updated: %s", newState ? "ON" : "OFF");
-    } else if (message->info.cluster == MS_WHITE_CLUSTER_ID) {
+    } else if (message->info.cluster == MS_LED_CLUSTER_ID) {
         prefs.begin(NVS_NAMESPACE, false);
 
         switch (message->attribute.id) {
@@ -230,12 +242,16 @@ void ZigbeeSensor::zbAttributeSet(const esp_zb_zcl_set_attr_value_message_t *mes
                 ledCount = *(uint16_t *)message->attribute.data.value;
                 prefs.putUShort(NVS_LED_COUNT, ledCount);
                 break;
+            case ATTR_ANIMATION_ID:
+                animation = *(uint8_t *)message->attribute.data.value;
+                prefs.putUChar(NVS_ANIMATION, animation);
+                break;
             default:
                 printf("Unknown brightness value: %d\n", message->attribute.id);
         }
 
         prefs.end();
-        _on_level_change(amberLevel, warmWhiteLevel, coolWhiteLevel, ledCount);
+        _on_level_change(amberLevel, warmWhiteLevel, coolWhiteLevel, ledCount, animation);
     }
 }
 
@@ -243,7 +259,7 @@ void ZigbeeSensor::onLightChange(void (*callback)(bool)) {
     _on_light_change = callback;
 }
 
-void ZigbeeSensor::onLevelChange(void (*callback)(uint8_t, uint8_t, uint8_t, uint16_t)) {
+void ZigbeeSensor::onLevelChange(void (*callback)(uint8_t, uint8_t, uint8_t, uint16_t, uint8_t)) {
     _on_level_change = callback;
 }
 
@@ -263,9 +279,10 @@ void ZigbeeSensor::init() {
     coolWhiteLevel = prefs.getUChar(NVS_COOL_WHITE, 255);
     amberLevel = prefs.getUChar(NVS_AMBER, 128);
     ledCount = prefs.getUShort(NVS_LED_COUNT, 1);
+    animation = prefs.getUChar(NVS_ANIMATION, 0);
     prefs.end();
 
-    _on_level_change(amberLevel, warmWhiteLevel, coolWhiteLevel, ledCount);
+    _on_level_change(amberLevel, warmWhiteLevel, coolWhiteLevel, ledCount, animation);
 }
 
 void ZigbeeSensor::onConnect() {
@@ -273,7 +290,7 @@ void ZigbeeSensor::onConnect() {
     uint32_t val = amberLevel;
     esp_zb_zcl_set_manufacturer_attribute_val(
         _endpoint,
-        MS_WHITE_CLUSTER_ID,
+        MS_LED_CLUSTER_ID,
         ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
         MANUFACTURER_CODE,
         ATTR_AMBER_LEVEL_ID,
@@ -283,7 +300,7 @@ void ZigbeeSensor::onConnect() {
     val = warmWhiteLevel;
     esp_zb_zcl_set_manufacturer_attribute_val(
         _endpoint,
-        MS_WHITE_CLUSTER_ID,
+        MS_LED_CLUSTER_ID,
         ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
         MANUFACTURER_CODE,
         ATTR_WARM_WHITE_LEVEL_ID,
@@ -293,7 +310,7 @@ void ZigbeeSensor::onConnect() {
     val = coolWhiteLevel;
     esp_zb_zcl_set_manufacturer_attribute_val(
         _endpoint,
-        MS_WHITE_CLUSTER_ID,
+        MS_LED_CLUSTER_ID,
         ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
         MANUFACTURER_CODE,
         ATTR_COOL_WHITE_LEVEL_ID,
@@ -303,10 +320,20 @@ void ZigbeeSensor::onConnect() {
     val = ledCount;
     esp_zb_zcl_set_manufacturer_attribute_val(
         _endpoint,
-        MS_WHITE_CLUSTER_ID,
+        MS_LED_CLUSTER_ID,
         ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
         MANUFACTURER_CODE,
         ATTR_LED_COUNT_ID,
+        &val,
+        false
+    );
+    val = animation;
+    esp_zb_zcl_set_manufacturer_attribute_val(
+        _endpoint,
+        MS_LED_CLUSTER_ID,
+        ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
+        MANUFACTURER_CODE,
+        ATTR_ANIMATION_ID,
         &val,
         false
     );
