@@ -13,7 +13,24 @@
 #include "zigbee/handlers.h"
 #include "zigbee/core.h"
 
+////////////////////////
+
+static const char *TAG = "TC-ZB";
+
+volatile bool occupancy_changed = false;
+volatile bool button_pressed = false;
+volatile bool switch_pressed = false;
+bool occupancy_state = false;
+bool led_state = false;
+bool manualMode = false;
+
+uint64_t lastHeartbeat = 0;
+uint64_t lastMotionUs = 0;
+uint64_t manualTimer = 0;
+
 ZigbeeSensor zbOccupancySensor = ZigbeeSensor(10);
+
+////////////////////////
 
 void IRAM_ATTR pirISR(void* data) {
     occupancy_changed = true;
@@ -28,17 +45,20 @@ void IRAM_ATTR switchISR(void* data) {
 }
 
 void setOnOff(bool onOff) {
+    led_state = onOff;
+
     ledDriver.setPowerTarget(onOff ? 255 : 0);
+
+    zbOccupancySensor.setOnOff(led_state);
+    zbOccupancySensor.report(false);
 }
 
-// TODO: Seperate occupancy timeout and light timeout
 void setOccupied(bool newVal) {
     occupancy_state = newVal;
     gpio_set_level(LEDB_PIN, newVal);
-    setOnOff(occupancy_state);
+
     zbOccupancySensor.setOccupancy(occupancy_state);
-    zbOccupancySensor.setOnOff(occupancy_state);
-    zbOccupancySensor.report();
+    zbOccupancySensor.report(true);
 }
 
 static esp_err_t deferred_driver_init(void) {
@@ -129,23 +149,37 @@ void esp_zb_app_signal_handler(esp_zb_app_signal_t *signal_struct) {
 }
 
 void handlePIR() {
+    bool sensorState = gpio_get_level(SENSOR_PIN);
+
     if (occupancy_changed) {
         occupancy_changed = false;
 
-        if (gpio_get_level(SENSOR_PIN)) {
-            lastMotionUs = esp_timer_get_time();
-
-            if (!occupancy_state && (esp_timer_get_time() < HOLDOUT_US || esp_timer_get_time() - holdOutUs >= HOLDOUT_US)) {
+        if (sensorState) {
+            if (!occupancy_state) {
                 setOccupied(true);
                 ESP_LOGI(TAG, "Occupancy detected");
             }
+        } else {
+            // Timeout starts from loss of occupancy
+            lastMotionUs = esp_timer_get_time();
         }
     }
 
     uint16_t occupancyTimeoutSec = zbOccupancySensor.getTimeout();
-    if (occupancy_state && esp_timer_get_time() - lastMotionUs >= occupancyTimeoutSec * 1000000ULL) {
+    if (!sensorState && occupancy_state && esp_timer_get_time() - lastMotionUs >= occupancyTimeoutSec * 1000000ULL) {
         setOccupied(false);
         ESP_LOGI(TAG, "Occupancy cleared");
+    }
+}
+
+void handleManual() {
+    if (manualMode && esp_timer_get_time() - manualTimer >= zbOccupancySensor.getManualHoldout() * 1000000ULL) {
+        manualMode = false;
+        setOnOff(occupancy_state);
+    }
+
+    if (led_state != occupancy_state && !manualMode) {
+        setOnOff(occupancy_state);
     }
 }
 
@@ -173,11 +207,17 @@ void handleHeartbeat() {
     lastHeartbeat = esp_timer_get_time();
 
     if (zigbeeCore.connected) {
-        zbOccupancySensor.report();
+        zbOccupancySensor.report(true);
     } else {
         ESP_LOGI(TAG, "Zigbee not connected, attempting reconnect...");
         zigbeeCore.start();
     }
+}
+
+void manualOnOff(bool newState) {
+    manualMode = true;
+    manualTimer = esp_timer_get_time();
+    setOnOff(newState);
 }
 
 void handleSwitch() {
@@ -187,20 +227,14 @@ void handleSwitch() {
     switch_pressed = false;
 
     ESP_LOGI(TAG, "Switch pressed");
-
-    if (occupancy_state) {
-        holdOutUs = esp_timer_get_time();
-    } else {
-        lastMotionUs = esp_timer_get_time();
-    }
-
-    setOccupied(!occupancy_state);
+    manualOnOff(!led_state);
 }
 
 static void main_task(void *pvParameters) {
     while (true) {
         handlePIR();
         handleSwitch();
+        handleManual();
         handleResetButton();
         handleHeartbeat();
 
@@ -243,7 +277,7 @@ extern "C" void app_main(void) {
 
     ESP_ERROR_CHECK(nvs_flash_init());
 
-    zbOccupancySensor.onLightChange(setOnOff);
+    zbOccupancySensor.onLightChange(manualOnOff);
     zbOccupancySensor.onLevelChange(setLevels);
     zbOccupancySensor.init();
 

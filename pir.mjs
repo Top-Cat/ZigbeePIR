@@ -9,7 +9,7 @@ export default {
     description: 'Automatically generated definition',
     extend: [
         m.occupancy({
-            pirConfig: ["otu_delay"]
+            pirConfig: ["otu_delay", "uto_delay"]
         }),
         m.onOff({
             powerOnBehavior: false

@@ -11,12 +11,13 @@
 #define ATTR_LED_COUNT_ID        0x0010
 
 #define OTA_UPGRADE_QUERY_INTERVAL (1 * 60)
-#define NVS_NAMESPACE "config"
-#define NVS_OCC_TIMEOUT "occ_timeout"
-#define NVS_AMBER       "amber"
-#define NVS_WARM_WHITE  "warm"
-#define NVS_COOL_WHITE  "cool"
-#define NVS_LED_COUNT   "count"
+#define NVS_NAMESPACE      "config"
+#define NVS_OCC_TIMEOUT    "occ_timeout"
+#define NVS_MAN_TIMEOUT    "man_timeout"
+#define NVS_AMBER          "amber"
+#define NVS_WARM_WHITE     "warm"
+#define NVS_COOL_WHITE     "cool"
+#define NVS_LED_COUNT      "count"
 
 class ZigbeeSensor : public ZigbeeDevice {
     public:
@@ -32,10 +33,11 @@ class ZigbeeSensor : public ZigbeeDevice {
         bool setOnOff(bool onOff);
         void init();
         uint16_t getTimeout();
+        uint16_t getManualHoldout();
 
         void onConnect();
         void requestOTA();
-        bool report();
+        bool report(bool occupancy);
     private:
         const char* TAG = "TC-ZBS";
         const char* manufacturer_name = "TC";
@@ -44,6 +46,7 @@ class ZigbeeSensor : public ZigbeeDevice {
 
 
         uint16_t occupancyTimeoutSec = 60;
+        uint16_t manualTimeoutSec    = 60;
         uint8_t amberLevel           = 0;
         uint8_t warmWhiteLevel       = 0;
         uint8_t coolWhiteLevel       = 0;

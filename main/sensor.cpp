@@ -47,6 +47,7 @@ void ZigbeeSensor::createOccupancyCluster(esp_zb_cluster_list_t* cluster_list) {
 
     uint16_t val = 0;
     esp_zb_occupancy_sensing_cluster_add_attr(occupancy_cluster, ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_PIR_OCC_TO_UNOCC_DELAY_ID, (void*) &val);
+    esp_zb_occupancy_sensing_cluster_add_attr(occupancy_cluster, ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_PIR_UNOCC_TO_OCC_DELAY_ID, (void*) &val);
 }
 
 void ZigbeeSensor::createOnOffCluster(esp_zb_cluster_list_t* cluster_list) {
@@ -181,48 +182,56 @@ esp_zb_cluster_list_t* ZigbeeSensor::createClusters() {
 }
 
 void ZigbeeSensor::zbAttributeSet(const esp_zb_zcl_set_attr_value_message_t *message) {
-    if (message->info.cluster == ESP_ZB_ZCL_CLUSTER_ID_OCCUPANCY_SENSING && message->attribute.id == ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_PIR_OCC_TO_UNOCC_DELAY_ID) {
+    if (message->info.cluster == ESP_ZB_ZCL_CLUSTER_ID_OCCUPANCY_SENSING) {
         uint16_t newTimeout = *(uint16_t *)message->attribute.data.value;
 
-        if (newTimeout < 5 || newTimeout > 3600) {
+        if (newTimeout < 5 || newTimeout > 6 * 3600) {
             ESP_LOGW(TAG, "Invalid occupancy timeout rejected");
             return;
         }
 
-        occupancyTimeoutSec = newTimeout;
         prefs.begin(NVS_NAMESPACE, false);
-        prefs.putUShort(NVS_OCC_TIMEOUT, newTimeout);
+
+        switch (message->attribute.id) {
+            case ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_PIR_OCC_TO_UNOCC_DELAY_ID:
+                occupancyTimeoutSec = newTimeout;
+                prefs.putUShort(NVS_OCC_TIMEOUT, newTimeout);
+                break;
+            case ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_PIR_UNOCC_TO_OCC_DELAY_ID:
+                manualTimeoutSec = newTimeout;
+                prefs.putUShort(NVS_MAN_TIMEOUT, newTimeout);
+                break;
+        }
+
         prefs.end();
 
-        ESP_LOGI(TAG, "Occupancy timeout updated: %u seconds", newTimeout);
+        ESP_LOGI(TAG, "Timeout updated %u: %u seconds", message->attribute.id, newTimeout);
     } else if (message->info.cluster == ESP_ZB_ZCL_CLUSTER_ID_ON_OFF && message->attribute.id == ESP_ZB_ZCL_ATTR_ON_OFF_ON_OFF_ID) {
         bool newState = *(bool *)message->attribute.data.value;
         _on_light_change(newState);
         ESP_LOGI(TAG, "On off updated: %s", newState ? "ON" : "OFF");
     } else if (message->info.cluster == MS_WHITE_CLUSTER_ID) {
-        uint8_t newValue = *(uint8_t *)message->attribute.data.value;
-
         prefs.begin(NVS_NAMESPACE, false);
 
         switch (message->attribute.id) {
             case ATTR_AMBER_LEVEL_ID:
-                amberLevel = newValue;
-                prefs.putUChar(NVS_AMBER, newValue);
+                amberLevel = *(uint8_t *)message->attribute.data.value;
+                prefs.putUChar(NVS_AMBER, amberLevel);
                 break;
             case ATTR_WARM_WHITE_LEVEL_ID:
-                warmWhiteLevel = newValue;
-                prefs.putUChar(NVS_WARM_WHITE, newValue);
+                warmWhiteLevel = *(uint8_t *)message->attribute.data.value;
+                prefs.putUChar(NVS_WARM_WHITE, warmWhiteLevel);
                 break;
             case ATTR_COOL_WHITE_LEVEL_ID:
-                coolWhiteLevel = newValue;
-                prefs.putUChar(NVS_COOL_WHITE, newValue);
+                coolWhiteLevel = *(uint8_t *)message->attribute.data.value;
+                prefs.putUChar(NVS_COOL_WHITE, coolWhiteLevel);
                 break;
             case ATTR_LED_COUNT_ID:
-                ledCount = newValue;
-                prefs.putUShort(NVS_LED_COUNT, newValue);
+                ledCount = *(uint16_t *)message->attribute.data.value;
+                prefs.putUShort(NVS_LED_COUNT, ledCount);
                 break;
             default:
-                printf("Unknown brightness value: %d -> %d\n", message->attribute.id, newValue);
+                printf("Unknown brightness value: %d\n", message->attribute.id);
         }
 
         prefs.end();
@@ -242,9 +251,14 @@ uint16_t ZigbeeSensor::getTimeout() {
     return occupancyTimeoutSec;
 }
 
+uint16_t ZigbeeSensor::getManualHoldout() {
+    return manualTimeoutSec;
+}
+
 void ZigbeeSensor::init() {
     prefs.begin(NVS_NAMESPACE, false);
     occupancyTimeoutSec = prefs.getUShort(NVS_OCC_TIMEOUT, 60);
+    manualTimeoutSec = prefs.getUShort(NVS_MAN_TIMEOUT, 3600);
     warmWhiteLevel = prefs.getUChar(NVS_WARM_WHITE, 255);
     coolWhiteLevel = prefs.getUChar(NVS_COOL_WHITE, 255);
     amberLevel = prefs.getUChar(NVS_AMBER, 128);
@@ -256,7 +270,7 @@ void ZigbeeSensor::init() {
 
 void ZigbeeSensor::onConnect() {
     esp_zb_lock_acquire(portMAX_DELAY);
-    uint16_t val = amberLevel;
+    uint32_t val = amberLevel;
     esp_zb_zcl_set_manufacturer_attribute_val(
         _endpoint,
         MS_WHITE_CLUSTER_ID,
@@ -302,6 +316,15 @@ void ZigbeeSensor::onConnect() {
         ESP_ZB_ZCL_CLUSTER_ID_OCCUPANCY_SENSING,
         ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
         ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_PIR_OCC_TO_UNOCC_DELAY_ID,
+        &val,
+        false
+    );
+    val = manualTimeoutSec;
+    esp_zb_zcl_set_attribute_val(
+        _endpoint,
+        ESP_ZB_ZCL_CLUSTER_ID_OCCUPANCY_SENSING,
+        ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
+        ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_PIR_UNOCC_TO_OCC_DELAY_ID,
         &val,
         false
     );
@@ -408,7 +431,7 @@ bool ZigbeeSensor::setTemperature(float temperature) {
     return reportTemperature;
 }
 
-bool ZigbeeSensor::report() {
+bool ZigbeeSensor::report(bool occupancy) {
     esp_zb_zcl_report_attr_cmd_t occupy_report_attr_cmd = {
         {
             .dst_addr_u = {},
@@ -449,13 +472,17 @@ bool ZigbeeSensor::report() {
     };
 
     esp_zb_lock_acquire(portMAX_DELAY);
-    esp_err_t ret, ret2, ret3 = ESP_OK;
-    ret = esp_zb_zcl_report_attr_cmd_req(&occupy_report_attr_cmd);
-    ret2 = esp_zb_zcl_report_attr_cmd_req(&onoff_report_attr_cmd);
+    esp_err_t ret, ret2 = ESP_OK;
+    if (occupancy) {
+        ret = esp_zb_zcl_report_attr_cmd_req(&occupy_report_attr_cmd);
+    } else {
+        ret = esp_zb_zcl_report_attr_cmd_req(&onoff_report_attr_cmd);
+    }
     if (reportTemperature) {
-        ret3 = esp_zb_zcl_report_attr_cmd_req(&temp_report_attr_cmd);
+        reportTemperature = false;
+        ret2 = esp_zb_zcl_report_attr_cmd_req(&temp_report_attr_cmd);
     }
     esp_zb_lock_release();
 
-    return ret == ESP_OK && ret2 == ESP_OK && ret3 == ESP_OK;
+    return ret == ESP_OK && ret2 == ESP_OK;
 }
