@@ -6,6 +6,7 @@
 
 #include "config.h"
 #include "zigbee/helpers.h"
+#include "light_driver.h"
 
 #include "sensor.h"
 
@@ -128,6 +129,16 @@ void ZigbeeSensor::createCustomCluster(esp_zb_cluster_list_t* cluster_list) {
         &val
     );
 
+    esp_zb_cluster_add_manufacturer_attr(
+        custom_cluster,
+        MS_LED_CLUSTER_ID,
+        ATTR_SPEED_ID,
+        MANUFACTURER_CODE,
+        ESP_ZB_ZCL_ATTR_TYPE_U8,
+        ESP_ZB_ZCL_ATTR_ACCESS_READ_WRITE,
+        &val
+    );
+
     esp_zb_cluster_list_add_custom_cluster(cluster_list, custom_cluster, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
 }
 
@@ -241,26 +252,32 @@ void ZigbeeSensor::zbAttributeSet(const esp_zb_zcl_set_attr_value_message_t *mes
             case ATTR_LED_COUNT_ID:
                 ledCount = *(uint16_t *)message->attribute.data.value;
                 prefs.putUShort(NVS_LED_COUNT, ledCount);
+                ledDriver.setCount(ledCount);
                 break;
             case ATTR_ANIMATION_ID:
                 animation = *(uint8_t *)message->attribute.data.value;
                 prefs.putUChar(NVS_ANIMATION, animation);
+                ledDriver.setAnimation((FadeAnimation) animation);
+                break;
+            case ATTR_SPEED_ID:
+                speed = *(uint8_t *)message->attribute.data.value;
+                prefs.putUChar(NVS_SPEED, speed);
+                ledDriver.setSpeed(speed);
                 break;
             default:
                 printf("Unknown brightness value: %d\n", message->attribute.id);
         }
 
+        if (message->attribute.id < 0x10) {
+            ledDriver.setLevels(amberLevel, warmWhiteLevel, coolWhiteLevel);
+        }
+
         prefs.end();
-        _on_level_change(amberLevel, warmWhiteLevel, coolWhiteLevel, ledCount, animation);
     }
 }
 
 void ZigbeeSensor::onLightChange(void (*callback)(bool)) {
     _on_light_change = callback;
-}
-
-void ZigbeeSensor::onLevelChange(void (*callback)(uint8_t, uint8_t, uint8_t, uint16_t, uint8_t)) {
-    _on_level_change = callback;
 }
 
 uint16_t ZigbeeSensor::getTimeout() {
@@ -280,9 +297,13 @@ void ZigbeeSensor::init() {
     amberLevel = prefs.getUChar(NVS_AMBER, 128);
     ledCount = prefs.getUShort(NVS_LED_COUNT, 1);
     animation = prefs.getUChar(NVS_ANIMATION, 0);
+    speed = prefs.getUChar(NVS_SPEED, 77);
     prefs.end();
 
-    _on_level_change(amberLevel, warmWhiteLevel, coolWhiteLevel, ledCount, animation);
+    ledDriver.setLevels(amberLevel, warmWhiteLevel, coolWhiteLevel);
+    ledDriver.setCount(ledCount);
+    ledDriver.setAnimation((FadeAnimation) animation);
+    ledDriver.setSpeed(speed);
 }
 
 void ZigbeeSensor::onConnect() {
@@ -334,6 +355,16 @@ void ZigbeeSensor::onConnect() {
         ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
         MANUFACTURER_CODE,
         ATTR_ANIMATION_ID,
+        &val,
+        false
+    );
+    val = speed;
+    esp_zb_zcl_set_manufacturer_attribute_val(
+        _endpoint,
+        MS_LED_CLUSTER_ID,
+        ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
+        MANUFACTURER_CODE,
+        ATTR_SPEED_ID,
         &val,
         false
     );

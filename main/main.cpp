@@ -278,7 +278,6 @@ extern "C" void app_main(void) {
     ESP_ERROR_CHECK(nvs_flash_init());
 
     zbOccupancySensor.onLightChange(manualOnOff);
-    zbOccupancySensor.onLevelChange(setLevels);
     zbOccupancySensor.init();
 
     zigbeeCore.registerEndpoint(&zbOccupancySensor);

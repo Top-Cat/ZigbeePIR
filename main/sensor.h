@@ -11,6 +11,7 @@
 #define ATTR_COOL_WHITE_LEVEL_ID 0x0003
 #define ATTR_LED_COUNT_ID        0x0010
 #define ATTR_ANIMATION_ID        0x0011
+#define ATTR_SPEED_ID            0x0012
 
 #define OTA_UPGRADE_QUERY_INTERVAL (1 * 60)
 #define NVS_NAMESPACE      "config"
@@ -21,6 +22,7 @@
 #define NVS_COOL_WHITE     "cool"
 #define NVS_LED_COUNT      "count"
 #define NVS_ANIMATION      "anim"
+#define NVS_SPEED          "speed"
 
 class ZigbeeSensor : public ZigbeeDevice {
     public:
@@ -30,7 +32,6 @@ class ZigbeeSensor : public ZigbeeDevice {
         void zbAttributeSet(const esp_zb_zcl_set_attr_value_message_t *message) override;
 
         void onLightChange(void (*callback)(bool));
-        void onLevelChange(void (*callback)(uint8_t, uint8_t, uint8_t, uint16_t, uint8_t));
         bool setOccupancy(bool occupied);
         bool setTemperature(float temperature);
         bool setOnOff(bool onOff);
@@ -55,6 +56,7 @@ class ZigbeeSensor : public ZigbeeDevice {
         uint8_t coolWhiteLevel       = 0;
         uint16_t ledCount            = 1;
         uint8_t animation            = 0;
+        uint8_t speed                = 0;
 
         Preferences prefs;
 
@@ -76,5 +78,4 @@ class ZigbeeSensor : public ZigbeeDevice {
         void createCustomCluster(esp_zb_cluster_list_t* cluster_list);
 
         void (*_on_light_change)(bool);
-        void (*_on_level_change)(uint8_t, uint8_t, uint8_t, uint16_t, uint8_t);
 };

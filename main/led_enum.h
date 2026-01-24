@@ -5,5 +5,6 @@
 enum class FadeAnimation : uint8_t {
     BASIC,
     ROWS,
-    FROM_ENDS
+    FROM_ENDS,
+    FROM_CENTER
 };

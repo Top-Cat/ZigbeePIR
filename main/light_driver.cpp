@@ -10,24 +10,25 @@ void LightDriver::setPowerTarget(uint8_t target) {
     powerTarget = target;
 }
 
-void LightDriver::setLevels(uint8_t amber, uint8_t warm_white, uint8_t cool_white, uint16_t count) {
+void LightDriver::setLevels(uint8_t amber, uint8_t warm_white, uint8_t cool_white) {
     s_warm = warm_white / 255.0;
     s_cold = cool_white / 255.0;
     s_amber = amber / 255.0;
+}
 
+void LightDriver::setCount(uint16_t count) {
     for (uint16_t i = driverLedCount; i > count; i--) {
         ESP_ERROR_CHECK(led_strip_set_pixel(s_led_strip, i - 1, 0, 0, 0));
     }
     driverLedCount = count;
 }
 
-void LightDriver::setAnimation(FadeAnimation _animation) {
-    animation = _animation;
+void LightDriver::setSpeed(uint8_t _speed) {
+    speed = _speed / 12;
 }
 
-void setLevels(uint8_t amber, uint8_t warm_white, uint8_t cool_white, uint16_t count, uint8_t animation) {
-    ledDriver.setLevels(amber, warm_white, cool_white, count);
-    ledDriver.setAnimation((FadeAnimation) animation);
+void LightDriver::setAnimation(FadeAnimation _animation) {
+    animation = _animation;
 }
 
 const double &min(const double &a, const double &b) {
@@ -44,6 +45,14 @@ uint8_t LightDriver::calculateFromEnds(uint8_t power, uint8_t i) {
     return max(0.0, min(255.0, 255.0 * delta / fadeWidth));
 }
 
+uint8_t LightDriver::calculateFromCenter(uint8_t power, uint8_t i) {
+    double center = (driverLedCount - 1) / 2.0;
+
+    double travel = (power / 255.0) * (center + fadeWidth);
+    double delta = travel - abs(i - center);
+    return max(0.0, min(255.0, 255.0 * delta / fadeWidth));
+}
+
 void LightDriver::setPower(uint8_t power) {
     ESP_ERROR_CHECK(ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, power * 32));
     ESP_ERROR_CHECK(ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0));
@@ -53,6 +62,9 @@ void LightDriver::setPower(uint8_t power) {
         switch (animation) {
             case FadeAnimation::FROM_ENDS:
                 newPower = calculateFromEnds(power, i);
+                break;
+            case FadeAnimation::FROM_CENTER:
+                newPower = calculateFromCenter(power, i);
                 break;
             case FadeAnimation::ROWS:
                 newPower = i % 2 == 0 ?
@@ -122,15 +134,14 @@ void lightTask(void *pvParameters) {
 
 void LightDriver::task() {
     ledDriver.init();
-    uint8_t power = 0;
-    uint8_t speed = 3;
+    float power = 0;
     uint8_t refresh = 10;
 
     while (true) {
         if (power < powerTarget) {
-            power += speed;
+            power = min(powerTarget, power + speed);
         } else if (power > powerTarget) {
-            power -= speed;
+            power = max(0, power - speed);
         } else {
             vTaskDelay(500 / portTICK_PERIOD_MS);
             if (refresh-- > 1) continue;
