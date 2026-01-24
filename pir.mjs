@@ -5,7 +5,8 @@ export default {
     zigbeeModel: ['Kitchen PIR Sensor'],
     model: 'Kitchen PIR Sensor',
     vendor: 'TC',
-    description: 'Automatically generated definition',
+    icon: 'device_icons/8783691.png',
+    description: 'Custom PIR sensor light',
     extend: [
         m.occupancy({
             pirConfig: ["otu_delay", "uto_delay"]
@@ -23,6 +24,7 @@ export default {
                 'cool_white': { ID: 0x0003, type: Zcl.DataType.UINT8, write: true, max: 0xff },
                 'count': { ID: 0x0010, type: Zcl.DataType.UINT16, write: true, max: 0xffff },
                 'animation': { ID: 0x0011, type: Zcl.DataType.ENUM8, write: true, max: 0xff },
+                'speed': { ID: 0x0012, type: Zcl.DataType.UINT8, write: true, max: 0xff },
             },
             commands: {},
             commandsResponse: {},
@@ -65,10 +67,20 @@ export default {
             cluster: 'tcSpecificLed',
             attribute: 'animation',
             lookup: {
-                'Basic': 0x00,
-                'Rows': 0x01,
-                'From ends': 0x02
+                'basic': 0x00,
+                'rows': 0x01,
+                'from_ends': 0x02,
+                'from_center': 0x03,
+                'sparkle': 0x04
             }
+        }),
+        m.numeric({
+            name: 'speed',
+            label: 'Animation Speed',
+            cluster: 'tcSpecificLed',
+            attribute: 'speed',
+            valueMin: 0,
+            valueMax: 255
         })
     ],
     ota: true

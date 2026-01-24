@@ -23,8 +23,9 @@ class LightDriver {
         float s_warm = 1, s_cold = 1, s_amber = 1;
 
         void setPower(uint8_t power);
-        uint8_t calculateFromEnds(uint8_t power, uint8_t i);
-        uint8_t calculateFromCenter(uint8_t power, uint8_t i);
+        uint8_t calculateFromEnds(uint8_t power, uint16_t i);
+        uint8_t calculateFromCenter(uint8_t power, uint16_t i);
+        uint8_t calculateSparkle(uint8_t power, uint16_t i);
 };
 
 extern LightDriver ledDriver;

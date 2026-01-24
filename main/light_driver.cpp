@@ -39,18 +39,36 @@ const double &max(const double &a, const double &b) {
     return (b > a) ? b : a;
 }
 
-uint8_t LightDriver::calculateFromEnds(uint8_t power, uint8_t i) {
+uint8_t LightDriver::calculateFromEnds(uint8_t power, uint16_t i) {
     double travel = (power / 255.0) * ((driverLedCount / 2.0) + fadeWidth);
     double delta = travel - min(i, driverLedCount - 1 - i);
     return max(0.0, min(255.0, 255.0 * delta / fadeWidth));
 }
 
-uint8_t LightDriver::calculateFromCenter(uint8_t power, uint8_t i) {
+uint8_t LightDriver::calculateFromCenter(uint8_t power, uint16_t i) {
     double center = (driverLedCount - 1) / 2.0;
 
     double travel = (power / 255.0) * (center + fadeWidth);
     double delta = travel - abs(i - center);
     return max(0.0, min(255.0, 255.0 * delta / fadeWidth));
+}
+
+static inline uint8_t hash16to8(uint16_t x) {
+    x ^= x >> 7;
+    x ^= x << 9;
+    x *= 0x9E37;
+    return (uint8_t)(x ^ (x >> 8));
+}
+
+uint8_t LightDriver::calculateSparkle(uint8_t progress, uint16_t i) {
+    constexpr uint8_t fadeWidth = 24;  // sparkle softness
+
+    uint8_t threshold = hash16to8(i);
+    int16_t delta = (int16_t)progress - (int16_t)threshold;
+
+    if (delta <= 0) return 0;
+    if (delta >= fadeWidth) return 255;
+    return (uint8_t)(255 * delta / fadeWidth);
 }
 
 void LightDriver::setPower(uint8_t power) {
@@ -65,6 +83,9 @@ void LightDriver::setPower(uint8_t power) {
                 break;
             case FadeAnimation::FROM_CENTER:
                 newPower = calculateFromCenter(power, i);
+                break;
+            case FadeAnimation::SPARKLE:
+                newPower = calculateSparkle(power, i);
                 break;
             case FadeAnimation::ROWS:
                 newPower = i % 2 == 0 ?
