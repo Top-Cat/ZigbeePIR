@@ -7,5 +7,7 @@ enum class FadeAnimation : uint8_t {
     ROWS,
     FROM_ENDS,
     FROM_CENTER,
-    SPARKLE
+    SPARKLE,
+    FROM_LEFT,
+    FROM_RIGHT
 };

@@ -71,7 +71,9 @@ export default {
                 'rows': 0x01,
                 'from_ends': 0x02,
                 'from_center': 0x03,
-                'sparkle': 0x04
+                'sparkle': 0x04,
+                'from_left': 0x05,
+                'from_right': 0x06
             }
         }),
         m.numeric({

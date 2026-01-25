@@ -23,9 +23,23 @@ class LightDriver {
         float s_warm = 1, s_cold = 1, s_amber = 1;
 
         void setPower(uint8_t power);
+        uint8_t calculateBasic(uint8_t power, uint16_t i);
+        uint8_t calculateRows(uint8_t power, uint16_t i);
         uint8_t calculateFromEnds(uint8_t power, uint16_t i);
         uint8_t calculateFromCenter(uint8_t power, uint16_t i);
         uint8_t calculateSparkle(uint8_t power, uint16_t i);
+        uint8_t calculateFromLeft(uint8_t power, uint16_t i);
+        uint8_t calculateFromRight(uint8_t power, uint16_t i);
+
+        static constexpr uint8_t (LightDriver::*animations[(uint8_t) FadeAnimation::MAX])(uint8_t, uint16_t) = {
+            &LightDriver::calculateBasic,
+            &LightDriver::calculateRows,
+            &LightDriver::calculateFromEnds,
+            &LightDriver::calculateFromCenter,
+            &LightDriver::calculateSparkle,
+            &LightDriver::calculateFromLeft,
+            &LightDriver::calculateFromRight
+        };
 };
 
 extern LightDriver ledDriver;

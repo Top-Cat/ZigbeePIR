@@ -39,6 +39,16 @@ const double &max(const double &a, const double &b) {
     return (b > a) ? b : a;
 }
 
+uint8_t LightDriver::calculateBasic(uint8_t power, uint16_t i) {
+    return power;
+}
+
+uint8_t LightDriver::calculateRows(uint8_t power, uint16_t i) {
+    return i % 2 == 0 ?
+        (power > 128 ? 255 : power * 2) :
+        (power > 128 ? (power - 128) * 2 : 0);
+}
+
 uint8_t LightDriver::calculateFromEnds(uint8_t power, uint16_t i) {
     double travel = (power / 255.0) * ((driverLedCount / 2.0) + fadeWidth);
     double delta = travel - min(i, driverLedCount - 1 - i);
@@ -53,6 +63,15 @@ uint8_t LightDriver::calculateFromCenter(uint8_t power, uint16_t i) {
     return max(0.0, min(255.0, 255.0 * delta / fadeWidth));
 }
 
+uint8_t LightDriver::calculateFromLeft(uint8_t power, uint16_t i) {
+    double travel = (power / 255.0) * (driverLedCount + fadeWidth) - i;
+    return max(0.0, min(255.0, 255.0 * travel / fadeWidth));
+}
+
+uint8_t LightDriver::calculateFromRight(uint8_t power, uint16_t i) {
+    return calculateFromLeft(power, driverLedCount - i);
+}
+
 static inline uint8_t hash16to8(uint16_t x) {
     x ^= x >> 7;
     x ^= x << 9;
@@ -61,9 +80,8 @@ static inline uint8_t hash16to8(uint16_t x) {
 }
 
 uint8_t LightDriver::calculateSparkle(uint8_t progress, uint16_t i) {
-    constexpr uint8_t fadeWidth = 24;  // sparkle softness
-
-    uint8_t threshold = hash16to8(i);
+    uint8_t hash = hash16to8(i);
+    uint8_t threshold = (uint16_t)hash * (255 - fadeWidth) / 255;
     int16_t delta = (int16_t)progress - (int16_t)threshold;
 
     if (delta <= 0) return 0;
@@ -76,26 +94,7 @@ void LightDriver::setPower(uint8_t power) {
     ESP_ERROR_CHECK(ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0));
 
     for (uint16_t i = 0; i < driverLedCount; i++) {
-        uint8_t newPower = power;
-        switch (animation) {
-            case FadeAnimation::FROM_ENDS:
-                newPower = calculateFromEnds(power, i);
-                break;
-            case FadeAnimation::FROM_CENTER:
-                newPower = calculateFromCenter(power, i);
-                break;
-            case FadeAnimation::SPARKLE:
-                newPower = calculateSparkle(power, i);
-                break;
-            case FadeAnimation::ROWS:
-                newPower = i % 2 == 0 ?
-                    (power > 128 ? 255 : power * 2) :
-                    (power > 128 ? (power - 128) * 2 : 0);
-                break;
-            case FadeAnimation::BASIC:
-            default:
-                break;
-        }
+        uint8_t newPower = (this->*animations[(uint8_t) animation])(power, i);
         ESP_ERROR_CHECK(led_strip_set_pixel(s_led_strip, i, s_cold * newPower, s_amber * newPower, s_warm * newPower));
     }
     ESP_ERROR_CHECK(led_strip_refresh(s_led_strip));
