@@ -8,13 +8,6 @@ export default {
     icon: 'device_icons/8783691.png',
     description: 'Custom PIR sensor light',
     extend: [
-        m.occupancy({
-            pirConfig: ["otu_delay", "uto_delay"]
-        }),
-        m.onOff({
-            powerOnBehavior: false
-        }),
-        m.temperature(),
         m.deviceAddCustomCluster("tcSpecificLed", {
             manufacturerCode: 0x1234,
             ID: 0xFC10,
@@ -28,6 +21,22 @@ export default {
             },
             commands: {},
             commandsResponse: {},
+        }),
+        m.deviceAddCustomCluster("tcSpecificLux", {
+            manufacturerCode: 0x1234,
+            ID: 0xFC11,
+            attributes: {
+                'inhibit_threshold': { ID: 0x0001, type: Zcl.DataType.UINT16, write: true, max: 0xffff }
+            },
+            commands: {},
+            commandsResponse: {},
+        }),
+
+        m.occupancy({
+            pirConfig: ["otu_delay", "uto_delay"]
+        }),
+        m.onOff({
+            powerOnBehavior: false
         }),
         m.numeric({
             name: 'amber',
@@ -62,7 +71,7 @@ export default {
             valueMax: 500,
         }),
         m.enumLookup({
-            name: 'animation',
+            name: 'effect',
             label: 'Light Animation',
             cluster: 'tcSpecificLed',
             attribute: 'animation',
@@ -83,7 +92,24 @@ export default {
             attribute: 'speed',
             valueMin: 0,
             valueMax: 255
-        })
+        }),
+        m.numeric({
+            name: 'inhibit_threshold',
+            label: 'Inhibit Threshold',
+            cluster: 'tcSpecificLux',
+            attribute: 'inhibit_threshold',
+            valueMin: 0,
+            valueMax: 88000,
+            scale: (value, type) => {
+                if (type === "from") {
+                    return 10 ** ((value - 1) / 10000);
+                } else {
+                    return 10000 * Math.log10(value) + 1;
+                }
+            }
+        }),
+        m.illuminance(),
+        m.temperature()
     ],
     ota: true
 };

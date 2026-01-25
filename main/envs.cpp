@@ -24,7 +24,6 @@ void handleTemperature() {
     zbOccupancySensor.setTemperature(averageTemp);
 }
 
-
 void setupTemp() {
     onewire_bus_config_t busConfig = {
         .bus_gpio_num = TEMP_PIN,
@@ -86,6 +85,9 @@ void handleLight() {
     if (tsl2591_get_lux(&light, &luxLocal) == ESP_OK) {
         lux = luxLocal;
         printf("Light value: %.2f\n", lux);
+
+        // TODO: Moving average?
+        zbOccupancySensor.setIlluminance(lux);
     }
 }
 

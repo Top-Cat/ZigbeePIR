@@ -61,9 +61,9 @@ void ZigbeeSensor::createTimeCluster(esp_zb_cluster_list_t* cluster_list) {
     int32_t gmt_offset = 0;
 
     esp_zb_attribute_list_t *time_cluster_server = esp_zb_zcl_attr_list_create(ESP_ZB_ZCL_CLUSTER_ID_TIME);
-    esp_zb_time_cluster_add_attr(time_cluster_server, ESP_ZB_ZCL_ATTR_TIME_TIME_ZONE_ID, (void *)&gmt_offset);
-    esp_zb_time_cluster_add_attr(time_cluster_server, ESP_ZB_ZCL_ATTR_TIME_TIME_ID, (void *)&utc_time);
-    esp_zb_time_cluster_add_attr(time_cluster_server, ESP_ZB_ZCL_ATTR_TIME_TIME_STATUS_ID, (void *)&_time_status);
+    esp_zb_time_cluster_add_attr(time_cluster_server, ESP_ZB_ZCL_ATTR_TIME_TIME_ZONE_ID, (void *) &gmt_offset);
+    esp_zb_time_cluster_add_attr(time_cluster_server, ESP_ZB_ZCL_ATTR_TIME_TIME_ID, (void *) &utc_time);
+    esp_zb_time_cluster_add_attr(time_cluster_server, ESP_ZB_ZCL_ATTR_TIME_TIME_STATUS_ID, (void *) &_time_status);
 
     esp_zb_attribute_list_t *time_cluster_client = esp_zb_zcl_attr_list_create(ESP_ZB_ZCL_CLUSTER_ID_TIME);
     esp_zb_cluster_list_add_time_cluster(cluster_list, time_cluster_server, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
@@ -75,12 +75,18 @@ void ZigbeeSensor::createTemperatureCluster(esp_zb_cluster_list_t* cluster_list)
     esp_zb_cluster_list_add_temperature_meas_cluster(cluster_list, temp_cluster, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
 }
 
-void ZigbeeSensor::createCustomCluster(esp_zb_cluster_list_t* cluster_list) {
-    esp_zb_attribute_list_t *custom_cluster = esp_zb_zcl_attr_list_create(MS_LED_CLUSTER_ID);
+void ZigbeeSensor::createIlluminanceCluster(esp_zb_cluster_list_t* cluster_list) {
+    esp_zb_attribute_list_t *lux_cluster = esp_zb_illuminance_meas_cluster_create(&lux_cfg);
+    esp_zb_cluster_list_add_illuminance_meas_cluster(cluster_list, lux_cluster, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
+}
+
+void ZigbeeSensor::createCustomClusters(esp_zb_cluster_list_t* cluster_list) {
+    esp_zb_attribute_list_t *led_cluster = esp_zb_zcl_attr_list_create(MS_LED_CLUSTER_ID);
+    esp_zb_attribute_list_t *lux_cluster = esp_zb_zcl_attr_list_create(MS_LUX_CLUSTER_ID);
 
     uint16_t val = 0;
     esp_zb_cluster_add_manufacturer_attr(
-        custom_cluster,
+        led_cluster,
         MS_LED_CLUSTER_ID,
         ATTR_AMBER_LEVEL_ID,
         MANUFACTURER_CODE,
@@ -90,7 +96,7 @@ void ZigbeeSensor::createCustomCluster(esp_zb_cluster_list_t* cluster_list) {
     );
 
     esp_zb_cluster_add_manufacturer_attr(
-        custom_cluster,
+        led_cluster,
         MS_LED_CLUSTER_ID,
         ATTR_WARM_WHITE_LEVEL_ID,
         MANUFACTURER_CODE,
@@ -100,7 +106,7 @@ void ZigbeeSensor::createCustomCluster(esp_zb_cluster_list_t* cluster_list) {
     );
 
     esp_zb_cluster_add_manufacturer_attr(
-        custom_cluster,
+        led_cluster,
         MS_LED_CLUSTER_ID,
         ATTR_COOL_WHITE_LEVEL_ID,
         MANUFACTURER_CODE,
@@ -110,7 +116,7 @@ void ZigbeeSensor::createCustomCluster(esp_zb_cluster_list_t* cluster_list) {
     );
 
     esp_zb_cluster_add_manufacturer_attr(
-        custom_cluster,
+        led_cluster,
         MS_LED_CLUSTER_ID,
         ATTR_LED_COUNT_ID,
         MANUFACTURER_CODE,
@@ -120,7 +126,7 @@ void ZigbeeSensor::createCustomCluster(esp_zb_cluster_list_t* cluster_list) {
     );
 
     esp_zb_cluster_add_manufacturer_attr(
-        custom_cluster,
+        led_cluster,
         MS_LED_CLUSTER_ID,
         ATTR_ANIMATION_ID,
         MANUFACTURER_CODE,
@@ -130,7 +136,7 @@ void ZigbeeSensor::createCustomCluster(esp_zb_cluster_list_t* cluster_list) {
     );
 
     esp_zb_cluster_add_manufacturer_attr(
-        custom_cluster,
+        led_cluster,
         MS_LED_CLUSTER_ID,
         ATTR_SPEED_ID,
         MANUFACTURER_CODE,
@@ -139,7 +145,18 @@ void ZigbeeSensor::createCustomCluster(esp_zb_cluster_list_t* cluster_list) {
         &val
     );
 
-    esp_zb_cluster_list_add_custom_cluster(cluster_list, custom_cluster, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
+    esp_zb_cluster_add_manufacturer_attr(
+        lux_cluster,
+        MS_LUX_CLUSTER_ID,
+        ATTR_INHIBIT_THRESHOLD_ID,
+        MANUFACTURER_CODE,
+        ESP_ZB_ZCL_ATTR_TYPE_U16,
+        ESP_ZB_ZCL_ATTR_ACCESS_READ_WRITE,
+        &val
+    );
+
+    esp_zb_cluster_list_add_custom_cluster(cluster_list, led_cluster, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
+    esp_zb_cluster_list_add_custom_cluster(cluster_list, lux_cluster, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
 }
 
 void ZigbeeSensor::createOtaCluster(esp_zb_cluster_list_t* cluster_list) {
@@ -197,7 +214,8 @@ esp_zb_cluster_list_t* ZigbeeSensor::createClusters() {
     createOtaCluster(cluster_list);
     createTimeCluster(cluster_list);
     createTemperatureCluster(cluster_list);
-    createCustomCluster(cluster_list);
+    createIlluminanceCluster(cluster_list);
+    createCustomClusters(cluster_list);
 
     return cluster_list;
 }
@@ -265,11 +283,24 @@ void ZigbeeSensor::zbAttributeSet(const esp_zb_zcl_set_attr_value_message_t *mes
                 ledDriver.setSpeed(speed);
                 break;
             default:
-                printf("Unknown brightness value: %d\n", message->attribute.id);
+                printf("Unknown led attr: %d\n", message->attribute.id);
         }
 
         if (message->attribute.id < 0x10) {
             ledDriver.setLevels(amberLevel, warmWhiteLevel, coolWhiteLevel);
+        }
+
+        prefs.end();
+    } else if (message->info.cluster == MS_LUX_CLUSTER_ID) {
+        prefs.begin(NVS_NAMESPACE, false);
+
+        switch (message->attribute.id) {
+            case ATTR_INHIBIT_THRESHOLD_ID:
+                inhibitThreshold = *(uint16_t *)message->attribute.data.value;
+                prefs.putUShort(NVS_INHIBIT_THRESHOLD, inhibitThreshold);
+                break;
+            default:
+                printf("Unknown lux attr: %d\n", message->attribute.id);
         }
 
         prefs.end();
@@ -298,6 +329,7 @@ void ZigbeeSensor::init() {
     ledCount = prefs.getUShort(NVS_LED_COUNT, 1);
     animation = prefs.getUChar(NVS_ANIMATION, 0);
     speed = prefs.getUChar(NVS_SPEED, 77);
+    inhibitThreshold = prefs.getUShort(NVS_INHIBIT_THRESHOLD, 0x696E);
     prefs.end();
 
     ledDriver.setLevels(amberLevel, warmWhiteLevel, coolWhiteLevel);
@@ -368,6 +400,16 @@ void ZigbeeSensor::onConnect() {
         &val,
         false
     );
+    val = inhibitThreshold;
+    esp_zb_zcl_set_manufacturer_attribute_val(
+        _endpoint,
+        MS_LUX_CLUSTER_ID,
+        ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
+        MANUFACTURER_CODE,
+        ATTR_INHIBIT_THRESHOLD_ID,
+        &val,
+        false
+    );
     val = occupancyTimeoutSec;
     esp_zb_zcl_set_attribute_val(
         _endpoint,
@@ -419,6 +461,11 @@ ZigbeeSensor::ZigbeeSensor(uint8_t endpoint) : ZigbeeDevice(ESP_ZB_HA_SIMPLE_SEN
         .measured_value = (short) 0x8000,
         .min_value = -5000,
         .max_value = 10000
+    };
+    lux_cfg = {
+        .measured_value = ESP_ZB_ZCL_ATTR_ILLUMINANCE_MEASUREMENT_MEASURED_VALUE_INVALID,
+        .min_value = 0x0001, // 1
+        .max_value = 0xc126 // 88,000
     };
 
     _cluster_list = createClusters();
@@ -489,6 +536,36 @@ bool ZigbeeSensor::setTemperature(float temperature) {
     return reportTemperature;
 }
 
+bool ZigbeeSensor::setIlluminance(float illuminance) {
+    uint16_t zigbeeLux;
+    if (illuminance < 1.0) {
+        zigbeeLux = ESP_ZB_ZCL_ATTR_ILLUMINANCE_MEASUREMENT_MEASURED_VALUE_TOO_LOW;
+    } else if (illuminance > 3.576e6) {
+        zigbeeLux = ESP_ZB_ZCL_ATTR_ILLUMINANCE_MEASUREMENT_MEASURED_VALUE_INVALID;
+    } else {
+        zigbeeLux = (10000.0 * log10(illuminance) + 1.0);
+    }
+
+    esp_zb_zcl_status_t ret = ESP_ZB_ZCL_STATUS_SUCCESS;
+
+    esp_zb_lock_acquire(portMAX_DELAY);
+    ret = esp_zb_zcl_set_attribute_val(
+        _endpoint,
+        ESP_ZB_ZCL_CLUSTER_ID_ILLUMINANCE_MEASUREMENT,
+        ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
+        ESP_ZB_ZCL_ATTR_ILLUMINANCE_MEASUREMENT_MEASURED_VALUE_ID,
+        &zigbeeLux,
+        false
+    );
+    esp_zb_lock_release();
+
+    reportIlluminance = ret == ESP_ZB_ZCL_STATUS_SUCCESS;
+    if (!reportIlluminance) {
+        ESP_LOGE(TAG, "Failed to set illuminance: 0x%x: %s", ret, esp_zb_zcl_status_to_name(ret));
+    }
+    return reportIlluminance;
+}
+
 bool ZigbeeSensor::report(bool occupancy) {
     esp_zb_zcl_report_attr_cmd_t occupy_report_attr_cmd = {
         {
@@ -529,8 +606,21 @@ bool ZigbeeSensor::report(bool occupancy) {
         ESP_ZB_ZCL_ATTR_TEMP_MEASUREMENT_VALUE_ID
     };
 
+    esp_zb_zcl_report_attr_cmd_t lux_report_attr_cmd = {
+        {
+            .dst_addr_u = {},
+            .dst_endpoint = 0,
+            .src_endpoint = _endpoint
+        },
+        ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT,
+        ESP_ZB_ZCL_CLUSTER_ID_ILLUMINANCE_MEASUREMENT,
+        {0, ESP_ZB_ZCL_CMD_DIRECTION_TO_CLI, 0},
+        ESP_ZB_ZCL_ATTR_NON_MANUFACTURER_SPECIFIC,
+        ESP_ZB_ZCL_ATTR_ILLUMINANCE_MEASUREMENT_MEASURED_VALUE_ID
+    };
+
     esp_zb_lock_acquire(portMAX_DELAY);
-    esp_err_t ret, ret2 = ESP_OK;
+    esp_err_t ret, ret2 = ESP_OK, ret3 = ESP_OK;
     if (occupancy) {
         ret = esp_zb_zcl_report_attr_cmd_req(&occupy_report_attr_cmd);
     } else {
@@ -540,7 +630,11 @@ bool ZigbeeSensor::report(bool occupancy) {
         reportTemperature = false;
         ret2 = esp_zb_zcl_report_attr_cmd_req(&temp_report_attr_cmd);
     }
+    if (reportIlluminance) {
+        reportIlluminance = false;
+        ret3 = esp_zb_zcl_report_attr_cmd_req(&lux_report_attr_cmd);
+    }
     esp_zb_lock_release();
 
-    return ret == ESP_OK && ret2 == ESP_OK;
+    return ret == ESP_OK && ret2 == ESP_OK && ret3 == ESP_OK;
 }

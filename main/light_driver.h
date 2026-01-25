@@ -18,6 +18,7 @@ class LightDriver {
         uint16_t driverLedCount = 1;
         FadeAnimation animation = FadeAnimation::BASIC;
         uint8_t fadeWidth = 10;
+        uint8_t sparkleSteps = 24;
 
         led_strip_handle_t s_led_strip;
         float s_warm = 1, s_cold = 1, s_amber = 1;
@@ -31,7 +32,7 @@ class LightDriver {
         uint8_t calculateFromLeft(uint8_t power, uint16_t i);
         uint8_t calculateFromRight(uint8_t power, uint16_t i);
 
-        static constexpr uint8_t (LightDriver::*animations[(uint8_t) FadeAnimation::MAX])(uint8_t, uint16_t) = {
+        static constexpr uint8_t (LightDriver::*animations[])(uint8_t, uint16_t) = {
             &LightDriver::calculateBasic,
             &LightDriver::calculateRows,
             &LightDriver::calculateFromEnds,

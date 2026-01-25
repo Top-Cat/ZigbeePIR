@@ -24,7 +24,7 @@ void LightDriver::setCount(uint16_t count) {
 }
 
 void LightDriver::setSpeed(uint8_t _speed) {
-    speed = _speed / 12;
+    speed = _speed / 12.0;
 }
 
 void LightDriver::setAnimation(FadeAnimation _animation) {
@@ -81,20 +81,21 @@ static inline uint8_t hash16to8(uint16_t x) {
 
 uint8_t LightDriver::calculateSparkle(uint8_t progress, uint16_t i) {
     uint8_t hash = hash16to8(i);
-    uint8_t threshold = (uint16_t)hash * (255 - fadeWidth) / 255;
+    uint8_t threshold = (uint16_t)hash * (255 - sparkleSteps) / 255;
     int16_t delta = (int16_t)progress - (int16_t)threshold;
 
     if (delta <= 0) return 0;
-    if (delta >= fadeWidth) return 255;
-    return (uint8_t)(255 * delta / fadeWidth);
+    if (delta >= sparkleSteps) return 255;
+    return (uint8_t)(255 * delta / sparkleSteps);
 }
 
 void LightDriver::setPower(uint8_t power) {
     ESP_ERROR_CHECK(ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, power * 32));
     ESP_ERROR_CHECK(ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0));
 
+    uint8_t newPower = power;
     for (uint16_t i = 0; i < driverLedCount; i++) {
-        uint8_t newPower = (this->*animations[(uint8_t) animation])(power, i);
+        newPower = (this->*animations[(uint8_t) animation])(power, i);
         ESP_ERROR_CHECK(led_strip_set_pixel(s_led_strip, i, s_cold * newPower, s_amber * newPower, s_warm * newPower));
     }
     ESP_ERROR_CHECK(led_strip_refresh(s_led_strip));
