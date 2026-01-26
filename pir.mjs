@@ -33,7 +33,17 @@ export default {
         }),
 
         m.occupancy({
-            pirConfig: ["otu_delay", "uto_delay"]
+            pirConfig: ["otu_delay"]
+        }),
+        m.numeric({
+            name: "pir_uto_delay",
+            label: "Manual timeout",
+            description: "Time in seconds before automatic mode resumes after manual changes.",
+            cluster: "msOccupancySensing",
+            attribute: "pirUToODelay",
+            valueMin: 0,
+            valueMax: 65534,
+            unit: "s"
         }),
         m.onOff({
             powerOnBehavior: false

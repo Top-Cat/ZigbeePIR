@@ -32,7 +32,7 @@
 class ZigbeeSensor : public ZigbeeDevice {
     public:
         ZigbeeSensor(uint8_t endpoint);
-        ~ZigbeeSensor() {}
+        ~ZigbeeSensor();
 
         void zbAttributeSet(const esp_zb_zcl_set_attr_value_message_t *message) override;
 

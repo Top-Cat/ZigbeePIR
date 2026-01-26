@@ -140,7 +140,7 @@ int32_t ZigbeeDevice::getTimezone(uint8_t endpoint, int32_t short_addr, esp_zb_i
 }
 
 void ZigbeeDevice::removeBoundDevice(uint8_t endpoint, esp_zb_ieee_addr_t ieee_addr) {
-    ESP_LOGI(
+    ESP_LOGD(
         PTAG,
         "Attempting to remove device with endpoint %d and IEEE address %02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x", endpoint, ieee_addr[7], ieee_addr[6], ieee_addr[5],
         ieee_addr[4], ieee_addr[3], ieee_addr[2], ieee_addr[1], ieee_addr[0]
@@ -148,7 +148,7 @@ void ZigbeeDevice::removeBoundDevice(uint8_t endpoint, esp_zb_ieee_addr_t ieee_a
 
     for (std::list<zb_device_params_t *>::iterator it = _bound_devices.begin(); it != _bound_devices.end(); ++it) {
         if ((*it)->endpoint == endpoint && memcmp((*it)->ieee_addr, ieee_addr, sizeof(esp_zb_ieee_addr_t)) == 0) {
-            ESP_LOGI(PTAG, "Found matching device, removing it");
+            ESP_LOGD(PTAG, "Found matching device, removing it");
             _bound_devices.erase(it);
             if (_bound_devices.empty()) {
                 _is_bound = false;
@@ -165,7 +165,7 @@ void ZigbeeDevice::removeBoundDevice(zb_device_params_t *device) {
         return;
     }
 
-    ESP_LOGI(
+    ESP_LOGD(
         PTAG,
         "Attempting to remove device with endpoint %d, short address 0x%04x, IEEE address %02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x", device->endpoint,
         device->short_addr, device->ieee_addr[7], device->ieee_addr[6], device->ieee_addr[5], device->ieee_addr[4], device->ieee_addr[3], device->ieee_addr[2],
@@ -178,7 +178,7 @@ void ZigbeeDevice::removeBoundDevice(zb_device_params_t *device) {
         bool ieee_addr_matches = (memcmp((*it)->ieee_addr, device->ieee_addr, sizeof(esp_zb_ieee_addr_t)) == 0);
 
         if (endpoint_matches && (short_addr_matches || ieee_addr_matches)) {
-            ESP_LOGI(PTAG, "Found matching device by %s, removing it", short_addr_matches ? "short address" : "IEEE address");
+            ESP_LOGD(PTAG, "Found matching device by %s, removing it", short_addr_matches ? "short address" : "IEEE address");
             _bound_devices.erase(it);
             if (_bound_devices.empty()) {
                 _is_bound = false;

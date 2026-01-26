@@ -90,7 +90,6 @@ void ZigbeeCore::start() {
     ESP_ERROR_CHECK(esp_zb_set_primary_network_channel_set(ESP_ZB_PRIMARY_CHANNEL_MASK));
     esp_zb_aps_data_indication_handler_register(zb_apsde_data_indication_handler);
 
-    ESP_LOGI(TAG, "Starting zigbee task");
     xTaskCreate(esp_zb_task, "Zigbee", 8192, NULL, 5, NULL);
 }
 
@@ -277,7 +276,7 @@ void ZigbeeCore::bindingTableCb(const esp_zb_zdo_binding_table_info_t *table_inf
 
                         if (!device_exists) {
                             (*it)->addBoundDevice(device);
-                            ESP_LOGI(
+                            ESP_LOGD(
                                 TAG,
                                 "Device bound to EP %d -> device endpoint: %d, %s: %s", record.src_endp, device->endpoint, is_ieee ? "ieee addr" : "short addr",
                                 is_ieee ? formatIEEEAddress(device->ieee_addr) : formatShortAddress(device->short_addr)
@@ -304,7 +303,7 @@ void ZigbeeCore::searchBindings() {
     esp_zb_zdo_mgmt_bind_param_t *mb_req = (esp_zb_zdo_mgmt_bind_param_t *)malloc(sizeof(esp_zb_zdo_mgmt_bind_param_t));
     mb_req->dst_addr = esp_zb_get_short_address();
     mb_req->start_index = 0;
-    ESP_LOGI(TAG, "Requesting binding table for address 0x%04x", mb_req->dst_addr);
+    ESP_LOGD(TAG, "Requesting binding table for address 0x%04x", mb_req->dst_addr);
     esp_zb_zdo_binding_table_req(mb_req, bindingTableCb, (void *)mb_req);
 }
 

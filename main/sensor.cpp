@@ -229,8 +229,6 @@ void ZigbeeSensor::zbAttributeSet(const esp_zb_zcl_set_attr_value_message_t *mes
             return;
         }
 
-        prefs.begin(NVS_NAMESPACE, false);
-
         switch (message->attribute.id) {
             case ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_PIR_OCC_TO_UNOCC_DELAY_ID:
                 occupancyTimeoutSec = newTimeout;
@@ -241,19 +239,12 @@ void ZigbeeSensor::zbAttributeSet(const esp_zb_zcl_set_attr_value_message_t *mes
                 prefs.putUShort(NVS_MAN_TIMEOUT, newTimeout);
                 break;
             default:
-                printf("Unknown occupancy cluster update: %d\n", message->attribute.id);
+                ESP_LOGW(TAG, "Unknown occupancy cluster update: %d", message->attribute.id);
         }
-
-        prefs.end();
-
-        ESP_LOGI(TAG, "Timeout updated %u: %u seconds", message->attribute.id, newTimeout);
     } else if (message->info.cluster == ESP_ZB_ZCL_CLUSTER_ID_ON_OFF && message->attribute.id == ESP_ZB_ZCL_ATTR_ON_OFF_ON_OFF_ID) {
         bool newState = *(bool *)message->attribute.data.value;
         _on_light_change(newState);
-        ESP_LOGI(TAG, "On off updated: %s", newState ? "ON" : "OFF");
     } else if (message->info.cluster == MS_LED_CLUSTER_ID) {
-        prefs.begin(NVS_NAMESPACE, false);
-
         switch (message->attribute.id) {
             case ATTR_AMBER_LEVEL_ID:
                 amberLevel = *(uint8_t *)message->attribute.data.value;
@@ -283,17 +274,13 @@ void ZigbeeSensor::zbAttributeSet(const esp_zb_zcl_set_attr_value_message_t *mes
                 ledDriver.setSpeed(speed);
                 break;
             default:
-                printf("Unknown led attr: %d\n", message->attribute.id);
+                ESP_LOGW(TAG, "Unknown led attr: %d", message->attribute.id);
         }
 
         if (message->attribute.id < 0x10) {
             ledDriver.setLevels(amberLevel, warmWhiteLevel, coolWhiteLevel);
         }
-
-        prefs.end();
     } else if (message->info.cluster == MS_LUX_CLUSTER_ID) {
-        prefs.begin(NVS_NAMESPACE, false);
-
         switch (message->attribute.id) {
             case ATTR_INHIBIT_THRESHOLD_ID:
                 inhibitThreshold = *(uint16_t *)message->attribute.data.value;
@@ -302,10 +289,8 @@ void ZigbeeSensor::zbAttributeSet(const esp_zb_zcl_set_attr_value_message_t *mes
                 triggerThreshold();
                 break;
             default:
-                printf("Unknown lux attr: %d\n", message->attribute.id);
+                ESP_LOGW(TAG, "Unknown lux attr: %d", message->attribute.id);
         }
-
-        prefs.end();
     }
 }
 
@@ -341,7 +326,6 @@ void ZigbeeSensor::init() {
     animation = prefs.getUChar(NVS_ANIMATION, 0);
     speed = prefs.getUChar(NVS_SPEED, 77);
     inhibitThreshold = prefs.getUShort(NVS_INHIBIT_THRESHOLD, 0x696E);
-    prefs.end();
 
     ledDriver.setLevels(amberLevel, warmWhiteLevel, coolWhiteLevel);
     ledDriver.setCount(ledCount);
@@ -350,96 +334,51 @@ void ZigbeeSensor::init() {
     triggerThreshold();
 }
 
+ZigbeeSensor::~ZigbeeSensor() {
+    prefs.end();
+}
+
 void ZigbeeSensor::onConnect() {
     esp_zb_lock_acquire(portMAX_DELAY);
-    uint32_t val = amberLevel;
-    esp_zb_zcl_set_manufacturer_attribute_val(
-        _endpoint,
-        MS_LED_CLUSTER_ID,
-        ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
-        MANUFACTURER_CODE,
-        ATTR_AMBER_LEVEL_ID,
-        &val,
-        false
-    );
-    val = warmWhiteLevel;
-    esp_zb_zcl_set_manufacturer_attribute_val(
-        _endpoint,
-        MS_LED_CLUSTER_ID,
-        ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
-        MANUFACTURER_CODE,
-        ATTR_WARM_WHITE_LEVEL_ID,
-        &val,
-        false
-    );
-    val = coolWhiteLevel;
-    esp_zb_zcl_set_manufacturer_attribute_val(
-        _endpoint,
-        MS_LED_CLUSTER_ID,
-        ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
-        MANUFACTURER_CODE,
-        ATTR_COOL_WHITE_LEVEL_ID,
-        &val,
-        false
-    );
-    val = ledCount;
-    esp_zb_zcl_set_manufacturer_attribute_val(
-        _endpoint,
-        MS_LED_CLUSTER_ID,
-        ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
-        MANUFACTURER_CODE,
-        ATTR_LED_COUNT_ID,
-        &val,
-        false
-    );
-    val = animation;
-    esp_zb_zcl_set_manufacturer_attribute_val(
-        _endpoint,
-        MS_LED_CLUSTER_ID,
-        ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
-        MANUFACTURER_CODE,
-        ATTR_ANIMATION_ID,
-        &val,
-        false
-    );
-    val = speed;
-    esp_zb_zcl_set_manufacturer_attribute_val(
-        _endpoint,
-        MS_LED_CLUSTER_ID,
-        ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
-        MANUFACTURER_CODE,
-        ATTR_SPEED_ID,
-        &val,
-        false
-    );
-    val = inhibitThreshold;
-    esp_zb_zcl_set_manufacturer_attribute_val(
-        _endpoint,
-        MS_LUX_CLUSTER_ID,
-        ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
-        MANUFACTURER_CODE,
+    uint32_t varArr[] = {
+        amberLevel, warmWhiteLevel, coolWhiteLevel, ledCount, animation, speed,
+        inhibitThreshold,
+        occupancyTimeoutSec, manualTimeoutSec
+    };
+    uint16_t attrIdArr[] = {
+        ATTR_AMBER_LEVEL_ID, ATTR_WARM_WHITE_LEVEL_ID, ATTR_COOL_WHITE_LEVEL_ID, ATTR_LED_COUNT_ID, ATTR_ANIMATION_ID, ATTR_SPEED_ID,
         ATTR_INHIBIT_THRESHOLD_ID,
-        &val,
-        false
-    );
-    val = occupancyTimeoutSec;
-    esp_zb_zcl_set_attribute_val(
-        _endpoint,
-        ESP_ZB_ZCL_CLUSTER_ID_OCCUPANCY_SENSING,
-        ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
-        ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_PIR_OCC_TO_UNOCC_DELAY_ID,
-        &val,
-        false
-    );
-    val = manualTimeoutSec;
-    esp_zb_zcl_set_attribute_val(
-        _endpoint,
-        ESP_ZB_ZCL_CLUSTER_ID_OCCUPANCY_SENSING,
-        ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
-        ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_PIR_UNOCC_TO_OCC_DELAY_ID,
-        &val,
-        false
-    );
+        ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_PIR_OCC_TO_UNOCC_DELAY_ID, ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_PIR_UNOCC_TO_OCC_DELAY_ID
+    };
+    uint16_t clusterIdArr[] = {
+        MS_LED_CLUSTER_ID, MS_LED_CLUSTER_ID, MS_LED_CLUSTER_ID, MS_LED_CLUSTER_ID, MS_LED_CLUSTER_ID, MS_LED_CLUSTER_ID,
+        MS_LUX_CLUSTER_ID,
+        ESP_ZB_ZCL_CLUSTER_ID_OCCUPANCY_SENSING, ESP_ZB_ZCL_CLUSTER_ID_OCCUPANCY_SENSING
+    };
+    uint8_t items = sizeof(attrIdArr) / sizeof(uint16_t);
+
+    for (uint8_t i = 0; i < items; i++) {
+        if (clusterIdArr[i] >= 0xFC00) {
+            esp_zb_zcl_set_manufacturer_attribute_val(
+                _endpoint,
+                clusterIdArr[i],
+                ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
+                MANUFACTURER_CODE,
+                attrIdArr[i],
+                &varArr[i],
+                false
+            );
+        } else {
+            esp_zb_zcl_set_attribute_val(
+                _endpoint,
+                clusterIdArr[i],
+                ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
+                attrIdArr[i],
+                &varArr[i],
+                false
+            );
+        }
+    }
     esp_zb_lock_release();
 }
 
@@ -578,75 +517,34 @@ bool ZigbeeSensor::setIlluminance(float illuminance) {
     return reportIlluminance;
 }
 
+esp_err_t doReport(uint8_t _endpoint, esp_zb_zcl_cluster_id_t cluster, uint16_t attr) {
+    // Must already have zb lock
+    esp_zb_zcl_report_attr_cmd_t report_attr_cmd = {
+        {
+            .dst_addr_u = {},
+            .dst_endpoint = 0,
+            .src_endpoint = _endpoint
+        },
+        ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT,
+        cluster,
+        {0, ESP_ZB_ZCL_CMD_DIRECTION_TO_CLI, 0},
+        ESP_ZB_ZCL_ATTR_NON_MANUFACTURER_SPECIFIC,
+        attr
+    };
+
+    return esp_zb_zcl_report_attr_cmd_req(&report_attr_cmd);
+}
+
 bool ZigbeeSensor::report(bool occupancy) {
-    esp_zb_zcl_report_attr_cmd_t occupy_report_attr_cmd = {
-        {
-            .dst_addr_u = {},
-            .dst_endpoint = 0,
-            .src_endpoint = _endpoint
-        },
-        ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT,
-        ESP_ZB_ZCL_CLUSTER_ID_OCCUPANCY_SENSING,
-        {0, ESP_ZB_ZCL_CMD_DIRECTION_TO_CLI, 0},
-        ESP_ZB_ZCL_ATTR_NON_MANUFACTURER_SPECIFIC,
-        ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_OCCUPANCY_ID
-    };
-
-    esp_zb_zcl_report_attr_cmd_t onoff_report_attr_cmd = {
-        {
-            .dst_addr_u = {},
-            .dst_endpoint = 0,
-            .src_endpoint = _endpoint
-        },
-        ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT,
-        ESP_ZB_ZCL_CLUSTER_ID_ON_OFF,
-        {0, ESP_ZB_ZCL_CMD_DIRECTION_TO_CLI, 0},
-        ESP_ZB_ZCL_ATTR_NON_MANUFACTURER_SPECIFIC,
-        ESP_ZB_ZCL_ATTR_ON_OFF_ON_OFF_ID
-    };
-
-    esp_zb_zcl_report_attr_cmd_t temp_report_attr_cmd = {
-        {
-            .dst_addr_u = {},
-            .dst_endpoint = 0,
-            .src_endpoint = _endpoint
-        },
-        ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT,
-        ESP_ZB_ZCL_CLUSTER_ID_TEMP_MEASUREMENT,
-        {0, ESP_ZB_ZCL_CMD_DIRECTION_TO_CLI, 0},
-        ESP_ZB_ZCL_ATTR_NON_MANUFACTURER_SPECIFIC,
-        ESP_ZB_ZCL_ATTR_TEMP_MEASUREMENT_VALUE_ID
-    };
-
-    esp_zb_zcl_report_attr_cmd_t lux_report_attr_cmd = {
-        {
-            .dst_addr_u = {},
-            .dst_endpoint = 0,
-            .src_endpoint = _endpoint
-        },
-        ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT,
-        ESP_ZB_ZCL_CLUSTER_ID_ILLUMINANCE_MEASUREMENT,
-        {0, ESP_ZB_ZCL_CMD_DIRECTION_TO_CLI, 0},
-        ESP_ZB_ZCL_ATTR_NON_MANUFACTURER_SPECIFIC,
-        ESP_ZB_ZCL_ATTR_ILLUMINANCE_MEASUREMENT_MEASURED_VALUE_ID
-    };
-
     esp_zb_lock_acquire(portMAX_DELAY);
-    esp_err_t ret, ret2 = ESP_OK, ret3 = ESP_OK;
-    if (occupancy) {
-        ret = esp_zb_zcl_report_attr_cmd_req(&occupy_report_attr_cmd);
-    } else {
-        ret = esp_zb_zcl_report_attr_cmd_req(&onoff_report_attr_cmd);
-    }
-    if (reportTemperature) {
-        reportTemperature = false;
-        ret2 = esp_zb_zcl_report_attr_cmd_req(&temp_report_attr_cmd);
-    }
-    if (reportIlluminance) {
-        reportIlluminance = false;
-        ret3 = esp_zb_zcl_report_attr_cmd_req(&lux_report_attr_cmd);
-    }
+    esp_err_t ret = (occupancy ?
+        doReport(_endpoint, ESP_ZB_ZCL_CLUSTER_ID_OCCUPANCY_SENSING, ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_OCCUPANCY_ID) :
+        doReport(_endpoint, ESP_ZB_ZCL_CLUSTER_ID_ON_OFF, ESP_ZB_ZCL_ATTR_ON_OFF_ON_OFF_ID)) |
+        (reportTemperature ? doReport(_endpoint, ESP_ZB_ZCL_CLUSTER_ID_TEMP_MEASUREMENT, ESP_ZB_ZCL_ATTR_TEMP_MEASUREMENT_VALUE_ID) : ESP_OK) |
+        (reportIlluminance ? doReport(_endpoint, ESP_ZB_ZCL_CLUSTER_ID_ILLUMINANCE_MEASUREMENT, ESP_ZB_ZCL_ATTR_ILLUMINANCE_MEASUREMENT_MEASURED_VALUE_ID) : ESP_OK);
+
+    reportTemperature = reportIlluminance = false;
     esp_zb_lock_release();
 
-    return ret == ESP_OK && ret2 == ESP_OK && ret3 == ESP_OK;
+    return ret == ESP_OK;
 }

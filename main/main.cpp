@@ -157,7 +157,6 @@ void handlePIR() {
         if (sensorState) {
             if (!occupancy_state) {
                 setOccupied(true);
-                ESP_LOGI(TAG, "Occupancy detected");
             }
         } else {
             // Timeout starts from loss of occupancy
@@ -168,7 +167,6 @@ void handlePIR() {
     uint16_t occupancyTimeoutSec = zbOccupancySensor.getTimeout();
     if (!sensorState && occupancy_state && esp_timer_get_time() - lastMotionUs >= occupancyTimeoutSec * 1000000ULL) {
         setOccupied(false);
-        ESP_LOGI(TAG, "Occupancy cleared");
     }
 }
 
@@ -227,8 +225,6 @@ void handleSwitch() {
         return;
 
     switch_pressed = false;
-
-    ESP_LOGI(TAG, "Switch pressed");
     manualOnOff(!led_state);
 }
 
@@ -286,12 +282,9 @@ extern "C" void app_main(void) {
     zigbeeCore.registerEndpoint(&zbOccupancySensor);
     zigbeeCore.start();
 
-    printf("Connecting to network\n");
     while (!zigbeeCore.connected) {
-        printf(".");
         vTaskDelay(100 / portTICK_PERIOD_MS);
     }
-    printf("\n");
 
     gpio_set_level(LEDA_PIN, 1);
     zbOccupancySensor.onConnect();
@@ -303,5 +296,4 @@ extern "C" void app_main(void) {
     if (gpio_get_level(SENSOR_PIN)) {
         occupancy_changed = true;
     }
-    ESP_LOGI(TAG, "app_main complete");
 }

@@ -80,7 +80,7 @@ esp_err_t ZigbeeHandlers::attributeUpdate(const esp_zb_zcl_set_attr_value_messag
 
     ESP_RETURN_ON_FALSE(message, ESP_FAIL, TAG, "Empty message");
     ESP_RETURN_ON_FALSE(message->info.status == ESP_ZB_ZCL_STATUS_SUCCESS, ESP_ERR_INVALID_ARG, TAG, "Received message: error status(%d)", message->info.status);
-    ESP_LOGI(TAG, "Received message: endpoint(%d), cluster(0x%x), attribute(0x%x), data size(%d)", message->info.dst_endpoint, message->info.cluster,
+    ESP_LOGD(TAG, "Received message: endpoint(%d), cluster(0x%x), attribute(0x%x), data size(%d)", message->info.dst_endpoint, message->info.cluster,
              message->attribute.id, message->attribute.data.size);
 
     for (std::list<ZigbeeDevice *>::iterator it = ep_objects->begin(); it != ep_objects->end(); ++it) {
@@ -146,7 +146,7 @@ esp_err_t ZigbeeHandlers::upgradeStatus(const esp_zb_zcl_ota_upgrade_value_messa
     if (message->info.status == ESP_ZB_ZCL_STATUS_SUCCESS) {
         switch (message->upgrade_status) {
         case ESP_ZB_ZCL_OTA_UPGRADE_STATUS_START:
-            ESP_LOGI(TAG, "Zigbee - OTA upgrade start");
+            ESP_LOGD(TAG, "Zigbee - OTA upgrade start");
             start_time = esp_timer_get_time();
             ota_started = false;
             break;
@@ -169,7 +169,7 @@ esp_err_t ZigbeeHandlers::upgradeStatus(const esp_zb_zcl_ota_upgrade_value_messa
 
             total_size = message->ota_header.image_size;
             offset += message->payload_size;
-            ESP_LOGI(TAG, "Zigbee - OTA Client receives data: progress [%ld/%ld]", offset, total_size);
+            ESP_LOGD(TAG, "Zigbee - OTA Client receives data: progress [%ld/%ld]", offset, total_size);
             if (message->payload_size && message->payload) {
                 uint16_t payload_size = 0;
                 void *payload = NULL;
@@ -184,7 +184,7 @@ esp_err_t ZigbeeHandlers::upgradeStatus(const esp_zb_zcl_ota_upgrade_value_messa
                     ret = esp_ota_write(s_ota_handle, (const void *)payload, payload_size);
                 }
                 if (ret != ESP_OK) {
-                    ESP_LOGI(TAG, "Zigbee - Failed to write OTA data to partition, status: %s", esp_err_to_name(ret));
+                    ESP_LOGE(TAG, "Zigbee - Failed to write OTA data to partition, status: %s", esp_err_to_name(ret));
                     return ret;
                 }
             }
