@@ -37,6 +37,8 @@ class ZigbeeSensor : public ZigbeeDevice {
         void zbAttributeSet(const esp_zb_zcl_set_attr_value_message_t *message) override;
 
         void onLightChange(void (*callback)(bool));
+        void onThresholdChange(void (*callback)(float));
+
         bool setOccupancy(bool occupied);
         bool setTemperature(float temperature);
         bool setIlluminance(float illuminance);
@@ -87,4 +89,6 @@ class ZigbeeSensor : public ZigbeeDevice {
         void createCustomClusters(esp_zb_cluster_list_t* cluster_list);
 
         void (*_on_light_change)(bool);
+        void (*_on_threshold_change)(float);
+        void triggerThreshold();
 };

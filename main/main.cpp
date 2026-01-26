@@ -173,13 +173,15 @@ void handlePIR() {
 }
 
 void handleManual() {
+    bool autoDesiredState = occupancy_state && !getInhibit();
+
     if (manualMode && esp_timer_get_time() - manualTimer >= zbOccupancySensor.getManualHoldout() * 1000000ULL) {
         manualMode = false;
-        setOnOff(occupancy_state);
+        setOnOff(autoDesiredState);
     }
 
-    if (led_state != occupancy_state && !manualMode) {
-        setOnOff(occupancy_state);
+    if (led_state != autoDesiredState && !manualMode) {
+        setOnOff(autoDesiredState);
     }
 }
 
@@ -278,6 +280,7 @@ extern "C" void app_main(void) {
     ESP_ERROR_CHECK(nvs_flash_init());
 
     zbOccupancySensor.onLightChange(manualOnOff);
+    zbOccupancySensor.onThresholdChange(setInhibit);
     zbOccupancySensor.init();
 
     zigbeeCore.registerEndpoint(&zbOccupancySensor);

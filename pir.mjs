@@ -100,9 +100,10 @@ export default {
             attribute: 'inhibit_threshold',
             valueMin: 0,
             valueMax: 88000,
+            unit: 'lx',
             scale: (value, type) => {
                 if (type === "from") {
-                    return 10 ** ((value - 1) / 10000);
+                    return Math.round(10 ** ((value - 1) / 10000));
                 } else {
                     return 10000 * Math.log10(value) + 1;
                 }

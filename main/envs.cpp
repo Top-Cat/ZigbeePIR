@@ -9,7 +9,10 @@ onewire_bus_handle_t bus = NULL;
 ds18b20_device_handle_t temp[2];
 uint8_t sensorCount = 0;
 
+float threshold = 0;
 float lux = 0;
+bool inhibit = false;
+
 tsl2591_t light;
 bool lightFound = false;
 
@@ -77,18 +80,35 @@ void setupLight() {
     }
 }
 
+void checkLux() {
+    if (!inhibit && lux > threshold) {
+        inhibit = true;
+    } else if (inhibit && lux < threshold - LUX_HYSTERESIS) {
+        inhibit = false;
+    }
+}
+
 void handleLight() {
     if (!lightFound) return;
 
     float luxLocal;
 
     if (tsl2591_get_lux(&light, &luxLocal) == ESP_OK) {
-        lux = luxLocal;
-        printf("Light value: %.2f\n", lux);
+        lux = (lux * (LUX_SAMPLES - 1) + luxLocal) / LUX_SAMPLES;
+        printf("Light value: %.2f, Smoothed: %.2f\n", luxLocal, lux);
 
-        // TODO: Moving average?
+        checkLux();
         zbOccupancySensor.setIlluminance(lux);
     }
+}
+
+bool getInhibit() {
+    return inhibit;
+}
+
+void setInhibit(float _threshold) {
+    threshold = _threshold;
+    checkLux();
 }
 
 void sensor_task(void *pvParameters) {

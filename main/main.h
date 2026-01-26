@@ -3,3 +3,4 @@
 #include "envs.h"
 
 #define HA_ESP_LIGHT_ENDPOINT           10
+void checkLux();

@@ -298,6 +298,8 @@ void ZigbeeSensor::zbAttributeSet(const esp_zb_zcl_set_attr_value_message_t *mes
             case ATTR_INHIBIT_THRESHOLD_ID:
                 inhibitThreshold = *(uint16_t *)message->attribute.data.value;
                 prefs.putUShort(NVS_INHIBIT_THRESHOLD, inhibitThreshold);
+
+                triggerThreshold();
                 break;
             default:
                 printf("Unknown lux attr: %d\n", message->attribute.id);
@@ -307,8 +309,17 @@ void ZigbeeSensor::zbAttributeSet(const esp_zb_zcl_set_attr_value_message_t *mes
     }
 }
 
+void ZigbeeSensor::triggerThreshold() {
+    float luxThreshold = pow(10, ((inhibitThreshold - 1) / 10000.0));
+    _on_threshold_change(luxThreshold);
+}
+
 void ZigbeeSensor::onLightChange(void (*callback)(bool)) {
     _on_light_change = callback;
+}
+
+void ZigbeeSensor::onThresholdChange(void (*callback)(float)) {
+    _on_threshold_change = callback;
 }
 
 uint16_t ZigbeeSensor::getTimeout() {
@@ -336,6 +347,7 @@ void ZigbeeSensor::init() {
     ledDriver.setCount(ledCount);
     ledDriver.setAnimation((FadeAnimation) animation);
     ledDriver.setSpeed(speed);
+    triggerThreshold();
 }
 
 void ZigbeeSensor::onConnect() {
