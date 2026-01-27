@@ -80,7 +80,7 @@ esp_err_t ZigbeeHandlers::attributeUpdate(const esp_zb_zcl_set_attr_value_messag
 
     ESP_RETURN_ON_FALSE(message, ESP_FAIL, TAG, "Empty message");
     ESP_RETURN_ON_FALSE(message->info.status == ESP_ZB_ZCL_STATUS_SUCCESS, ESP_ERR_INVALID_ARG, TAG, "Received message: error status(%d)", message->info.status);
-    ESP_LOGD(TAG, "Received message: endpoint(%d), cluster(0x%x), attribute(0x%x), data size(%d)", message->info.dst_endpoint, message->info.cluster,
+    ESP_LOGI(TAG, "Received message: endpoint(%d), cluster(0x%x), attribute(0x%x), data size(%d)", message->info.dst_endpoint, message->info.cluster,
              message->attribute.id, message->attribute.data.size);
 
     for (std::list<ZigbeeDevice *>::iterator it = ep_objects->begin(); it != ep_objects->end(); ++it) {

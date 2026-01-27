@@ -3,6 +3,7 @@
 #include "envs.h"
 
 // Defined in main.cpp
+static const char *TAG = "TC-ENV";
 extern ZigbeeSensor zbOccupancySensor;
 
 onewire_bus_handle_t bus = NULL;
@@ -53,15 +54,15 @@ void setupTemp() {
 
             if (ds18b20_new_device_from_enumeration(&next, &dsCfg, &temp[sensorCount]) == ESP_OK) {
                 ds18b20_get_device_address(temp[sensorCount], &addr);
-                printf("Found sensor[%d], address: %016llX\n", sensorCount, addr);
+                ESP_LOGD(TAG, "Found sensor[%d], address: %016llX\n", sensorCount, addr);
                 sensorCount++;
             } else {
-                printf("Found unknown device, address: %016llX\n", next.address);
+                ESP_LOGD(TAG, "Found unknown device, address: %016llX\n", next.address);
             }
         }
     } while (result != ESP_ERR_NOT_FOUND);
     ESP_ERROR_CHECK(onewire_del_device_iter(iter));
-    printf("Found %d temperature sensors\n", sensorCount);
+    ESP_LOGD(TAG, "Found %d temperature sensors\n", sensorCount);
 }
 
 void setupLight() {
@@ -95,7 +96,7 @@ void handleLight() {
 
     if (tsl2591_get_lux(&light, &luxLocal) == ESP_OK) {
         lux = (lux * (LUX_SAMPLES - 1) + luxLocal) / LUX_SAMPLES;
-        printf("Light value: %.2f, Smoothed: %.2f\n", luxLocal, lux);
+        ESP_LOGD(TAG, "Light value: %.2f, Smoothed: %.2f\n", luxLocal, lux);
 
         checkLux();
         zbOccupancySensor.setIlluminance(lux);
