@@ -61,6 +61,7 @@ class ZigbeeDevice {
         time_t _read_time;
         int32_t _read_timezone;
         SemaphoreHandle_t lock;
+        uint32_t OneJanuary2000 = 946684800;
 
         bool setTime(tm time);
         bool setTimezone(int32_t gmt_offset);

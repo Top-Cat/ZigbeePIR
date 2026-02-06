@@ -1,5 +1,6 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
+#include "sys/time.h"
 
 #include "esp_zigbee_core.h"
 #include "helpers.h"
@@ -14,6 +15,10 @@ ZigbeeDevice::ZigbeeDevice(esp_zb_ha_standard_devices_t deviceId, uint8_t endpoi
         .app_device_id = (uint16_t) deviceId,
         .app_device_version = 0
     };
+
+    if (!lock) {
+        lock = xSemaphoreCreateBinary();
+    }
 }
 
 void ZigbeeDevice::zbReadTimeCluster(const esp_zb_zcl_attribute_t *attribute) {
@@ -32,7 +37,7 @@ void ZigbeeDevice::zbReadTimeCluster(const esp_zb_zcl_attribute_t *attribute) {
 
 bool ZigbeeDevice::setTime(tm time) {
     esp_zb_zcl_status_t ret = ESP_ZB_ZCL_STATUS_SUCCESS;
-    time_t utc_time = mktime(&time);
+    time_t utc_time = mktime(&time) - OneJanuary2000;
     ESP_LOGD(PTAG, "Setting time to %lld", utc_time);
     esp_zb_lock_acquire(portMAX_DELAY);
     ret = esp_zb_zcl_set_attribute_val(_endpoint, ESP_ZB_ZCL_CLUSTER_ID_TIME, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE, ESP_ZB_ZCL_ATTR_TIME_TIME_ID, &utc_time, false);
@@ -88,16 +93,22 @@ tm ZigbeeDevice::getTime(uint8_t endpoint, int32_t short_addr, esp_zb_ieee_addr_
         return tm();
     }
 
-    struct tm *timeinfo = localtime(&_read_time);
-    if (timeinfo) {
-        setTime(*timeinfo);
+    time_t unixTime = OneJanuary2000 + _read_time;
+    tm timeinfo;
+    if (localtime_r(&unixTime, &timeinfo)) {
+        // Update RTC
+        timeval tv = {unixTime, 0};
+        settimeofday(&tv, NULL);
+
+        // Update attribute
+        setTime(timeinfo);
 
         _time_status |= 0x02;
         esp_zb_lock_acquire(portMAX_DELAY);
         esp_zb_zcl_set_attribute_val(_endpoint, ESP_ZB_ZCL_CLUSTER_ID_TIME, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE, ESP_ZB_ZCL_ATTR_TIME_TIME_STATUS_ID, &_time_status, false);
         esp_zb_lock_release();
 
-        return *timeinfo;
+        return timeinfo;
     } else {
         ESP_LOGE(PTAG, "Error while converting time");
         return tm();

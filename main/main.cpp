@@ -28,7 +28,7 @@ uint64_t lastHeartbeat = 0;
 uint64_t lastMotionUs = 0;
 uint64_t manualTimer = 0;
 
-ZigbeeSensor zbOccupancySensor = ZigbeeSensor(10);
+ZigbeeSensor zbOccupancySensor = ZigbeeSensor(OCCUPANCY_SENSOR_ENDPOINT_NUMBER);
 
 ////////////////////////
 
