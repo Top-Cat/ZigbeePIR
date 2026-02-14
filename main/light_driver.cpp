@@ -90,7 +90,7 @@ uint8_t LightDriver::calculateSparkle(uint8_t progress, uint16_t i) {
 }
 
 void LightDriver::setPower(uint8_t power) {
-    ESP_ERROR_CHECK(ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, power * 32));
+    ESP_ERROR_CHECK(ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, power * 32 / 4));
     ESP_ERROR_CHECK(ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0));
 
     uint8_t newPower = power;
@@ -99,6 +99,11 @@ void LightDriver::setPower(uint8_t power) {
         ESP_ERROR_CHECK(led_strip_set_pixel(s_led_strip, i, s_cold * newPower, s_amber * newPower, s_warm * newPower));
     }
     ESP_ERROR_CHECK(led_strip_refresh(s_led_strip));
+}
+
+void LightDriver::setOccupancyState(bool state) {
+    ESP_ERROR_CHECK(ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_1, state ? 64 * 32 : 0));
+    ESP_ERROR_CHECK(ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_1));
 }
 
 void LightDriver::init() {
@@ -114,7 +119,7 @@ void LightDriver::init() {
     ESP_ERROR_CHECK(ledc_timer_config(&ledc_timer));
 
     ledc_channel_config_t ledc_channel = {
-        .gpio_num       = LEDC_PIN,
+        .gpio_num       = LEDA_PIN,
         .speed_mode     = LEDC_LOW_SPEED_MODE,
         .channel        = LEDC_CHANNEL_0,
         .intr_type      = LEDC_INTR_DISABLE,
@@ -126,6 +131,10 @@ void LightDriver::init() {
             .output_invert = false
         }
     };
+    ESP_ERROR_CHECK(ledc_channel_config(&ledc_channel));
+
+    ledc_channel.gpio_num = LEDB_PIN;
+    ledc_channel.channel = LEDC_CHANNEL_1;
     ESP_ERROR_CHECK(ledc_channel_config(&ledc_channel));
 
     // Led strip

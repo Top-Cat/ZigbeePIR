@@ -1,5 +1,6 @@
 import {Zcl} from "zigbee-herdsman";
 import * as m from 'zigbee-herdsman-converters/lib/modernExtend';
+import {options} from 'zigbee-herdsman-converters/lib/exposes';
 
 export default {
     zigbeeModel: ['Kitchen PIR Sensor'],
@@ -109,17 +110,22 @@ export default {
             cluster: 'tcSpecificLux',
             attribute: 'inhibit_threshold',
             valueMin: 0,
-            valueMax: 88000,
+            valueMax: 10000,
+            valueStep: 0.1,
             unit: 'lx',
             scale: (value, type) => {
                 if (type === "from") {
-                    return Math.round(10 ** ((value - 1) / 10000));
-                } else {
-                    return 10000 * Math.log10(value) + 1;
+                    return Math.round((10 ** ((value - 1) / 10000)) * 10) / 10;
                 }
+                return 10000 * Math.log10(value) + 1;
             }
         }),
-        m.illuminance(),
+        {
+            ...(m.illuminance()),
+            options: [
+                options.precision("illuminance")
+            ]
+        },
         m.temperature()
     ],
     ota: true

@@ -55,14 +55,15 @@ void setOnOff(bool onOff) {
 
 void setOccupied(bool newVal) {
     occupancy_state = newVal;
-    gpio_set_level(LEDB_PIN, newVal);
+    ledDriver.setOccupancyState(newVal);
 
     zbOccupancySensor.setOccupancy(occupancy_state);
     zbOccupancySensor.report(true);
 }
 
 static esp_err_t deferred_driver_init(void) {
-    return xTaskCreate(lightTask, "light_driver", 8192, NULL, 4, NULL);
+    BaseType_t ret = xTaskCreate(lightTask, "light_driver", 8192, NULL, 4, NULL);
+    return ret == pdPASS ? ESP_OK : ESP_FAIL;
 }
 
 static void bdb_start_top_level_commissioning_cb(uint8_t mode_mask) {
@@ -171,7 +172,7 @@ void handlePIR() {
 }
 
 void handleManual() {
-    bool autoDesiredState = occupancy_state && !getInhibit();
+    bool autoDesiredState = occupancy_state && !envs.getInhibit();
 
     if (manualMode && esp_timer_get_time() - manualTimer >= zbOccupancySensor.getManualHoldout() * 1000000ULL) {
         manualMode = false;
@@ -220,6 +221,10 @@ void manualOnOff(bool newState) {
     setOnOff(newState);
 }
 
+void zbInhibit(float inhibit) {
+    envs.setInhibit(inhibit);
+}
+
 void handleSwitch() {
     if (!switch_pressed)
         return;
@@ -243,7 +248,7 @@ static void main_task(void *pvParameters) {
 
 extern "C" void app_main(void) {
     gpio_config_t gpioConfig = {
-        .pin_bit_mask = (1ULL << BUTTON_PIN) | (1ULL << SWITCH_PIN),
+        .pin_bit_mask = BIT64(BUTTON_PIN) | BIT64(SWITCH_PIN),
         .mode = GPIO_MODE_INPUT,
         .pull_up_en = GPIO_PULLUP_ENABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
@@ -251,13 +256,13 @@ extern "C" void app_main(void) {
     };
     gpio_config(&gpioConfig);
 
-    gpioConfig.pin_bit_mask = 1ULL << SENSOR_PIN;
+    gpioConfig.pin_bit_mask = BIT64(SENSOR_PIN);
     gpioConfig.intr_type = GPIO_INTR_ANYEDGE;
     gpioConfig.pull_up_en = GPIO_PULLUP_DISABLE;
     gpioConfig.pull_down_en = GPIO_PULLDOWN_ENABLE;
     gpio_config(&gpioConfig);
 
-    gpioConfig.pin_bit_mask = (1ULL << LEDA_PIN) | (1ULL << LEDB_PIN) | (1ULL << LEDC_PIN) | (1ULL << WS2812_PIN) | (1ULL << TEMP_PIN);
+    gpioConfig.pin_bit_mask = BIT64(LEDA_PIN) | BIT64(LEDB_PIN) | BIT64(LEDC_PIN) | BIT64(WS2812_PIN) | BIT64(TEMP_PIN);
     gpioConfig.intr_type = GPIO_INTR_DISABLE;
     gpioConfig.pull_down_en = GPIO_PULLDOWN_DISABLE;
     gpioConfig.mode = GPIO_MODE_OUTPUT;
@@ -276,7 +281,7 @@ extern "C" void app_main(void) {
     ESP_ERROR_CHECK(nvs_flash_init());
 
     zbOccupancySensor.onLightChange(manualOnOff);
-    zbOccupancySensor.onThresholdChange(setInhibit);
+    zbOccupancySensor.onThresholdChange(zbInhibit);
     zbOccupancySensor.init();
 
     zigbeeCore.registerEndpoint(&zbOccupancySensor);
@@ -286,7 +291,7 @@ extern "C" void app_main(void) {
         vTaskDelay(100 / portTICK_PERIOD_MS);
     }
 
-    gpio_set_level(LEDA_PIN, 1);
+    gpio_set_level(LEDC_PIN, 1);
     zbOccupancySensor.onConnect();
     zbOccupancySensor.requestOTA();
 

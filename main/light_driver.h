@@ -11,6 +11,7 @@ class LightDriver {
         void setSpeed(uint8_t speed);
         void setPowerTarget(uint8_t target);
         void setAnimation(FadeAnimation animation);
+        void setOccupancyState(bool state);
         void task();
     private:
         float speed = 3;

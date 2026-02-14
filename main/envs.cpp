@@ -3,21 +3,9 @@
 #include "envs.h"
 
 // Defined in main.cpp
-static const char *TAG = "TC-ENV";
 extern ZigbeeSensor zbOccupancySensor;
 
-onewire_bus_handle_t bus = NULL;
-ds18b20_device_handle_t temp[2];
-uint8_t sensorCount = 0;
-
-float threshold = 0;
-float lux = 0;
-bool inhibit = false;
-
-tsl2591_t light;
-bool lightFound = false;
-
-void handleTemperature() {
+void Envs::handleTemperature() {
     ESP_ERROR_CHECK(ds18b20_trigger_temperature_conversion_for_all(bus));
 
     float averageTemp = 0, currentTemp = 0;
@@ -28,7 +16,7 @@ void handleTemperature() {
     zbOccupancySensor.setTemperature(averageTemp);
 }
 
-void setupTemp() {
+void Envs::setupTemp() {
     onewire_bus_config_t busConfig = {
         .bus_gpio_num = TEMP_PIN,
         .flags = {
@@ -65,7 +53,7 @@ void setupTemp() {
     ESP_LOGD(TAG, "Found %d temperature sensors\n", sensorCount);
 }
 
-void setupLight() {
+void Envs::setupLight() {
     ESP_ERROR_CHECK(i2cdev_init());
 
     ESP_ERROR_CHECK(tsl2591_init_desc(&light, I2C_NUM_0, SDA_PIN, SCL_PIN));
@@ -81,7 +69,7 @@ void setupLight() {
     }
 }
 
-void checkLux() {
+void Envs::checkLux() {
     if (!inhibit && lux > threshold) {
         inhibit = true;
     } else if (inhibit && lux < threshold - LUX_HYSTERESIS) {
@@ -89,36 +77,54 @@ void checkLux() {
     }
 }
 
-void handleLight() {
+void Envs::handleLight() {
     if (!lightFound) return;
 
     float luxLocal;
 
     if (tsl2591_get_lux(&light, &luxLocal) == ESP_OK) {
-        lux = (lux * (LUX_SAMPLES - 1) + luxLocal) / LUX_SAMPLES;
-        ESP_LOGD(TAG, "Light value: %.2f, Smoothed: %.2f\n", luxLocal, lux);
+        readings[luxIdx] = luxLocal;
+        luxIdx = (luxIdx + 1) % LUX_SAMPLES;
+
+        float luxSum = 0;
+        for (uint8_t i = 0; i < LUX_SAMPLES; i++) {
+            luxSum += readings[i];
+        }
+
+        lux = luxSum / LUX_SAMPLES;
+        ESP_LOGV(TAG, "Light value: %.2f, Smoothed: %.2f\n", luxLocal, lux);
 
         checkLux();
         zbOccupancySensor.setIlluminance(lux);
     }
 }
 
-bool getInhibit() {
+bool Envs::getInhibit() {
     return inhibit;
 }
 
-void setInhibit(float _threshold) {
+void Envs::setInhibit(float _threshold) {
     threshold = _threshold;
     checkLux();
 }
 
 void sensor_task(void *pvParameters) {
-    setupTemp();
-    setupLight();
+    envs.setup();
 
     while (true) {
-        handleTemperature();
-        handleLight();
-        vTaskDelay(5000 / portTICK_PERIOD_MS);
+        envs.task();
     }
 }
+
+void Envs::setup() {
+    setupTemp();
+    setupLight();
+}
+
+void Envs::task() {
+    handleTemperature();
+    handleLight();
+    vTaskDelay(5000 / portTICK_PERIOD_MS);
+}
+
+Envs envs;
