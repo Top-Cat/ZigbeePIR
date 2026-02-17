@@ -106,6 +106,10 @@ void LightDriver::setOccupancyState(bool state) {
     ESP_ERROR_CHECK(ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_1));
 }
 
+void LightDriver::identify(uint16_t secs) {
+    identifySteps = secs * 2;
+}
+
 void LightDriver::init() {
     // Debug LED
     ledc_timer_config_t ledc_timer = {
@@ -168,6 +172,12 @@ void LightDriver::task() {
     uint8_t refresh = 10;
 
     while (true) {
+        if (identifySteps > 0) {
+            ledDriver.setPower((identifySteps-- % 2) * 255);
+            vTaskDelay(500 / portTICK_PERIOD_MS);
+            continue;
+        }
+
         if (power < powerTarget) {
             power = min(powerTarget, power + speed);
         } else if (power > powerTarget) {

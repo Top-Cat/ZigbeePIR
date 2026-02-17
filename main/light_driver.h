@@ -12,6 +12,7 @@ class LightDriver {
         void setPowerTarget(uint8_t target);
         void setAnimation(FadeAnimation animation);
         void setOccupancyState(bool state);
+        void identify(uint16_t secs);
         void task();
     private:
         float speed = 3;
@@ -20,6 +21,7 @@ class LightDriver {
         FadeAnimation animation = FadeAnimation::BASIC;
         uint8_t fadeWidth = 10;
         uint8_t sparkleSteps = 24;
+        uint8_t identifySteps = 0;
 
         led_strip_handle_t s_led_strip;
         float s_warm = 1, s_cold = 1, s_amber = 1;

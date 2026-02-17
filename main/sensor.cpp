@@ -220,6 +220,13 @@ esp_zb_cluster_list_t* ZigbeeSensor::createClusters() {
     return cluster_list;
 }
 
+void ZigbeeSensor::zbCommand(const zb_zcl_parsed_hdr_t* cmdInfo, const void* data) {
+    if (cmdInfo->cluster_id == ESP_ZB_ZCL_CLUSTER_ID_IDENTIFY && cmdInfo->cmd_id == ESP_ZB_ZCL_CMD_IDENTIFY_IDENTIFY_ID) {
+        uint16_t secs = *(uint16_t *)data;
+        ledDriver.identify(secs);
+    }
+}
+
 void ZigbeeSensor::zbAttributeSet(const esp_zb_zcl_set_attr_value_message_t *message) {
     if (message->info.cluster == ESP_ZB_ZCL_CLUSTER_ID_OCCUPANCY_SENSING) {
         uint16_t newTimeout = *(uint16_t *)message->attribute.data.value;

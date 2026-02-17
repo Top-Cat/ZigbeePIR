@@ -49,6 +49,7 @@ export default {
         m.onOff({
             powerOnBehavior: false
         }),
+        m.identify(),
         m.numeric({
             name: 'amber',
             label: 'Amber Brightness',

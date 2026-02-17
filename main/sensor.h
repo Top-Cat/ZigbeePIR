@@ -35,6 +35,7 @@ class ZigbeeSensor : public ZigbeeDevice {
         ~ZigbeeSensor();
 
         void zbAttributeSet(const esp_zb_zcl_set_attr_value_message_t *message) override;
+        void zbCommand(const zb_zcl_parsed_hdr_t* cmdInfo, const void* data) override;
 
         void onLightChange(void (*callback)(bool));
         void onThresholdChange(void (*callback)(float));
